@@ -11,12 +11,18 @@ For now, the backend is built only with Supabase:
 
 There is no custom Express, Nest, or FastAPI server in Sprint 1.
 
+The repository now also contains a minimal FastAPI service in `backend/api/`. It is reserved for server-only features in later sprints and does not replace Supabase in Sprint 1.
+
 ## Folder Structure
 
 ```text
 backend/
   .env.example
   README.md
+  api/
+    README.md
+    app/
+    tests/
   supabase/
     README.md
     migrations/

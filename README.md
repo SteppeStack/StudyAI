@@ -2,7 +2,7 @@
 
 StudyAI is split into two independent work areas:
 
-- `backend/` - Supabase backend, database schema, auth, RLS policies, migrations.
+- `backend/` - Supabase schema/auth/RLS/migrations and the Python API for server-only features.
 - `frontend/` - Next.js frontend, pages, UI, Supabase client integration.
 
 ## Team Responsibilities
@@ -12,6 +12,7 @@ Backend developer:
 - Works only inside `backend/`.
 - Creates and updates Supabase migrations.
 - Applies migrations to the shared Supabase project.
+- Owns the FastAPI service in `backend/api/` for server-only operations such as AI requests.
 - Documents new tables, fields, policies, and required frontend env values.
 - Does not edit frontend code unless the team agrees first.
 
