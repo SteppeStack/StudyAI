@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppSidebar from "@/components/AppSidebar";
+import { useLanguage } from "@/components/LanguageProvider";
 import { supabase } from "@/lib/supabase";
 import {
   ActivityEvent,
@@ -14,79 +15,55 @@ import {
 } from "@/lib/dashboardData";
 
 type Profile = {
-  id: string;
-  email: string;
   full_name: string | null;
+  email: string | null;
   avatar_url: string | null;
   subscription_plan: string | null;
-  account_role: "student" | "teacher" | null;
+  account_role: string | null;
 };
-
-const tools = [
-  {
-    icon: "AI",
-    title: "AI Tutor",
-    description: "Get personalized explanations and step-by-step guidance.",
-    button: "Start Learning →",
-    href: "/ai-tutor",
-    color: "bg-blue-50 text-blue-600",
-    buttonColor: "bg-blue-50 text-blue-600 border-blue-100",
-  },
-  {
-    icon: "AH",
-    title: "Assignment Helper",
-    description: "Analyze assignments, get feedback, and improve your answers.",
-    button: "Open Helper →",
-    href: "/dashboard",
-    color: "bg-green-50 text-green-500",
-    buttonColor: "bg-green-50 text-green-600 border-green-100",
-  },
-  {
-    icon: "DA",
-    title: "Diploma Assistant",
-    description: "Get help with diploma projects and academic writing.",
-    button: "Go to Diploma →",
-    href: "/dashboard",
-    color: "bg-violet-50 text-violet-600",
-    buttonColor: "bg-violet-50 text-violet-600 border-violet-100",
-  },
-  {
-    icon: "DG",
-    title: "Document Generator",
-    description: "Create reports, essays, summaries, and documents.",
-    button: "Create Document →",
-    href: "/dashboard",
-    color: "bg-orange-50 text-orange-500",
-    buttonColor: "bg-orange-50 text-orange-600 border-orange-100",
-  },
-  {
-    icon: "EP",
-    title: "Exam Preparation",
-    description: "Prepare for exams with quizzes, flashcards, and study plans.",
-    button: "Start Preparing →",
-    href: "/dashboard",
-    color: "bg-emerald-50 text-emerald-500",
-    buttonColor: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  },
-  {
-    icon: "FA",
-    title: "File Assistant",
-    description: "Upload study files and get summaries, key points, and questions.",
-    button: "Open Files →",
-    href: "/dashboard",
-    color: "bg-cyan-50 text-cyan-600",
-    buttonColor: "bg-cyan-50 text-cyan-600 border-cyan-100",
-  },
-];
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { t } = useLanguage();
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [usage, setUsage] = useState<MonthlyUsage | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
+
+  const tools = [
+    {
+      title: t.tools.aiTutorTitle,
+      description: t.tools.aiTutorDescription,
+      href: "/ai-tutor",
+    },
+    {
+      title: t.tools.assignmentsTitle,
+      description: t.tools.assignmentsDescription,
+      href: "/assignments",
+    },
+    {
+      title: t.tools.diplomaTitle,
+      description: t.tools.diplomaDescription,
+      href: "/diploma",
+    },
+    {
+      title: t.tools.documentsTitle,
+      description: t.tools.documentsDescription,
+      href: "/documents",
+    },
+    {
+      title: t.tools.examPrepTitle,
+      description: t.tools.examPrepDescription,
+      href: "/exam-prep",
+    },
+    {
+      title: t.tools.filesTitle,
+      description: t.tools.filesDescription,
+      href: "/files",
+    },
+  ];
 
   useEffect(() => {
     async function loadDashboard() {
@@ -99,43 +76,22 @@ export default function DashboardPage() {
 
       const user = sessionData.session.user;
 
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData } = await supabase
         .from("profiles")
-        .select("*")
+        .select("full_name,email,avatar_url,subscription_plan,account_role")
         .eq("id", user.id)
         .single();
 
-      if (profileError) {
-        console.error(profileError.message);
+      if (profileData) {
+        setProfile(profileData as Profile);
       }
 
-      setProfile(profileData as Profile);
-
-      const { data: subscriptionData, error: subscriptionError } =
-        await getCurrentSubscription();
-
-      if (subscriptionError) {
-        console.error(subscriptionError.message);
-      }
+      const { data: subscriptionData } = await getCurrentSubscription();
+      const { data: usageData } = await getCurrentMonthUsage();
+      const { data: activityData } = await getRecentActivity();
 
       setSubscription(subscriptionData as Subscription | null);
-
-      const { data: usageData, error: usageError } =
-        await getCurrentMonthUsage();
-
-      if (usageError) {
-        console.error(usageError.message);
-      }
-
       setUsage(usageData as MonthlyUsage | null);
-
-      const { data: activityData, error: activityError } =
-        await getRecentActivity();
-
-      if (activityError) {
-        console.error(activityError.message);
-      }
-
       setActivity((activityData || []) as ActivityEvent[]);
       setLoading(false);
     }
@@ -148,12 +104,19 @@ export default function DashboardPage() {
     router.push("/login");
   }
 
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-slate-600">Loading...</p>
-      </main>
-    );
+  function translatePlanName(planName: string) {
+    if (planName.toLowerCase() === "free") return t.common.free;
+    return planName;
+  }
+
+  function translateRole(role: string) {
+    if (role.toLowerCase() === "student") return t.common.student;
+    return role;
+  }
+
+  function translateStatus(status: string) {
+    if (status.toLowerCase() === "active") return t.common.active;
+    return status;
   }
 
   const currentPlanRaw = subscription?.plans;
@@ -161,231 +124,276 @@ export default function DashboardPage() {
     ? currentPlanRaw[0]
     : currentPlanRaw;
 
-  const planName = currentPlan?.display_name || "Free";
-  const subscriptionStatus = subscription?.status || "active";
-
-  const monthlyLimit = currentPlan?.monthly_ai_request_limit || 300;
-  const aiRequestsUsed = usage?.ai_requests_used || 0;
+  const planName = translatePlanName(currentPlan?.display_name || "Free");
+  const monthlyLimit = currentPlan?.monthly_ai_request_limit || 100;
+  const usedRequests = usage?.ai_requests_used || 0;
   const documentsGenerated = usage?.documents_generated || 0;
+  const usagePercent = Math.min((usedRequests / monthlyLimit) * 100, 100);
+
+  const displayName = profile?.full_name || "Student";
+  const email = profile?.email || "";
+  const avatarUrl = profile?.avatar_url || "";
+
+  const initials = displayName
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-50 text-slate-900">
+        <AppSidebar />
+
+        <section className="min-h-screen px-4 pt-20 lg:ml-[300px] lg:flex lg:items-center lg:justify-center lg:pt-0">
+          <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white px-8 py-6 text-center shadow-sm">
+            <p className="text-sm font-medium text-slate-600">
+              Loading dashboard...
+            </p>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <AppSidebar />
 
-      <section className="ml-[270px] flex min-h-screen flex-col">
-        <header className="fixed left-[270px] right-0 top-0 z-10 flex h-20 items-center justify-between border-b border-slate-200 bg-white px-10">
-          <input
-            className="w-[420px] rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Search anything..."
-          />
-
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-slate-200" />
-
+      <section className="min-h-screen px-4 pb-8 pt-20 sm:px-6 lg:ml-[300px] lg:px-10 lg:py-10">
+        <div className="mx-auto w-full max-w-[1680px]">
+          <header className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <p className="text-sm font-bold">
-                {profile?.full_name || "Student"}
-              </p>
-              <p className="text-xs capitalize text-slate-500">
-                {profile?.account_role || "student"}
+              <h1 className="text-2xl font-bold sm:text-3xl">
+                {t.dashboardPage.welcomeBack}, {displayName}
+              </h1>
+
+              <p className="mt-2 text-sm text-slate-500 sm:text-base">
+                {t.dashboardPage.subtitle}
               </p>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="ml-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-500"
-            >
-              Logout
-            </button>
-          </div>
-        </header>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500 sm:w-[280px] xl:w-[360px]"
+                placeholder={t.dashboardPage.search}
+              />
 
-        <div className="px-10 pb-10 pt-28">
-          <div className="mb-10">
-            <h2 className="text-3xl font-bold">
-              Welcome back, {profile?.full_name || "Student"}!
-            </h2>
-            <p className="mt-2 text-slate-500">
-              Ready to continue your learning journey?
-            </p>
-          </div>
+              <button
+                onClick={() => router.push("/settings")}
+                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-slate-50"
+              >
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt="Avatar"
+                    className="h-9 w-9 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-600">
+                    {initials || "ST"}
+                  </div>
+                )}
 
-          <div className="grid grid-cols-[700px_360px] gap-10">
-            <div>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-10">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">
+                    {displayName}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">{email}</p>
+                </div>
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
+              >
+                {t.common.logout}
+              </button>
+            </div>
+          </header>
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
+            <div className="space-y-6">
+              <section className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
                 {tools.map((tool) => (
-                  <div key={tool.title}>
-                    <div className="h-[170px] rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-                      <div
-                        className={`mb-5 flex h-[42px] w-[42px] items-center justify-center rounded-xl text-xs font-bold ${tool.color}`}
-                      >
-                        {tool.icon}
-                      </div>
-
-                      <h3 className="text-lg font-bold">{tool.title}</h3>
-
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        {tool.description}
-                      </p>
+                  <button
+                    key={tool.href}
+                    onClick={() => router.push(tool.href)}
+                    className="rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-md"
+                  >
+                    <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-lg font-bold text-blue-600">
+                      {tool.title[0]}
                     </div>
 
-                    <button
-                      onClick={() => router.push(tool.href)}
-                      className={`mt-3 rounded-lg border px-4 py-2 text-xs font-medium ${tool.buttonColor}`}
-                    >
-                      {tool.button}
-                    </button>
-                  </div>
-                ))}
-              </div>
+                    <h2 className="text-lg font-bold text-slate-900">
+                      {tool.title}
+                    </h2>
 
-              <div className="mt-20 rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
-                <div className="mb-8 flex items-center justify-between">
-                  <h3 className="text-xl font-bold">Recent Activity</h3>
-                  <button className="text-sm font-medium text-blue-600">
-                    View all
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                      {tool.description}
+                    </p>
+                  </button>
+                ))}
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold">
+                      {t.dashboardPage.recentActivity}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {t.dashboardPage.recentActivitySubtitle}
+                    </p>
+                  </div>
+
+                  <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    {t.dashboardPage.viewAll}
                   </button>
                 </div>
 
-                {activity.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                    <p className="text-sm font-medium text-slate-600">
-                      No activity yet.
-                    </p>
-                    <p className="mt-2 text-sm text-slate-500">
-                      Your recent AI chats, documents, and study actions will
-                      appear here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {activity.map((event) => (
+                {activity.length > 0 ? (
+                  <div className="space-y-4">
+                    {activity.map((item) => (
                       <div
-                        key={event.id}
-                        className="flex items-center justify-between"
+                        key={item.id}
+                        className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-4"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-blue-600">
-                            {event.event_type?.slice(0, 1).toUpperCase() ||
-                              "A"}
-                          </div>
-
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
-                            <p className="text-sm font-semibold">
-                              {event.title}
+                            <p className="font-semibold text-slate-900">
+                              {item.title}
                             </p>
-                            <p className="text-xs text-slate-500">
-                              {event.description ||
-                                new Date(event.created_at).toLocaleString()}
+
+                            <p className="mt-1 text-sm text-slate-500">
+                              {item.description || item.event_type}
                             </p>
                           </div>
-                        </div>
 
-                        <span className="text-xs font-medium capitalize text-green-500">
-                          {event.status || "Completed"}
-                        </span>
+                          <span className="text-xs font-medium text-slate-400">
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
+                    <p className="font-semibold text-slate-700">
+                      {t.dashboardPage.noRecentActivity}
+                    </p>
+
+                    <p className="mt-2 text-sm text-slate-500">
+                      {t.dashboardPage.noRecentActivitySubtitle}
+                    </p>
+                  </div>
                 )}
-              </div>
+              </section>
             </div>
 
             <aside className="space-y-6">
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold">Your Plan</p>
-                  <span className="text-xs font-medium capitalize text-green-500">
-                    {subscriptionStatus}
-                  </span>
-                </div>
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold">
+                  {t.dashboardPage.yourPlan}
+                </h2>
 
-                <h3 className="mt-3 text-xl font-bold">{planName}</h3>
-
-                <p className="mt-2 text-sm text-slate-500">
-                  Monthly limit: {monthlyLimit} AI requests
-                </p>
-
-                <button
-  onClick={() => router.push("/subscription")}
-  className="mt-6 w-full rounded-lg bg-blue-50 py-2.5 text-sm font-medium text-blue-600"
->
-  Manage Subscription
-</button>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-bold">Usage This Month</p>
-
-                <div className="mt-6 text-center">
-                  <p className="text-2xl font-bold">
-                    {aiRequestsUsed} / {monthlyLimit}
+                <div className="mt-5 rounded-2xl bg-blue-50 p-5">
+                  <p className="text-sm font-medium text-blue-600">
+                    {t.dashboardPage.currentPlan}
                   </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    AI requests used
+
+                  <p className="mt-1 text-2xl font-bold text-blue-700">
+                    {planName}
+                  </p>
+
+                  <p className="mt-2 text-sm text-blue-700">
+                    {monthlyLimit} {t.dashboardPage.aiRequestsPerMonth}
                   </p>
                 </div>
 
                 <button
-  onClick={() => router.push("/subscription")}
-  className="mt-6 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white"
->
-  Upgrade Plan
-</button>
-              </div>
+                  onClick={() => router.push("/subscription")}
+                  className="mt-5 w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                >
+                  {t.dashboardPage.manageSubscription}
+                </button>
+              </section>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="text-lg font-bold">Quick Stats</h3>
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold">
+                  {t.dashboardPage.usageThisMonth}
+                </h2>
+
+                <div className="mt-5">
+                  <div className="mb-2 flex justify-between text-sm">
+                    <span className="text-slate-500">
+                      {t.dashboardPage.aiRequests}
+                    </span>
+                    <span className="font-semibold">
+                      {usedRequests} / {monthlyLimit}
+                    </span>
+                  </div>
+
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-blue-600"
+                      style={{ width: `${usagePercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 gap-4">
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm text-slate-500">
+                      {t.dashboardPage.documents}
+                    </p>
+                    <p className="mt-1 text-xl font-bold">
+                      {documentsGenerated}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm text-slate-500">
+                      {t.dashboardPage.chats}
+                    </p>
+                    <p className="mt-1 text-xl font-bold">{activity.length}</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold">
+                  {t.dashboardPage.quickStats}
+                </h2>
 
                 <div className="mt-5 space-y-4 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">AI Requests</span>
+                    <span className="text-slate-500">
+                      {t.dashboardPage.accountRole}
+                    </span>
                     <span className="font-semibold">
-                      {aiRequestsUsed} / {monthlyLimit}
+                      {translateRole(profile?.account_role || "student")}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
                     <span className="text-slate-500">
-                      Documents Generated
+                      {t.dashboardPage.planStatus}
                     </span>
-                    <span className="font-semibold">{documentsGenerated}</span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Account Role</span>
-                    <span className="font-semibold capitalize">
-                      {profile?.account_role || "student"}
+                    <span className="font-semibold">
+                      {translateStatus(subscription?.status || "active")}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Plan Status</span>
-                    <span className="font-semibold capitalize">
-                      {subscriptionStatus}
+                    <span className="text-slate-500">
+                      {t.dashboardPage.workspace}
                     </span>
+                    <span className="font-semibold">StudyAI</span>
                   </div>
                 </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="text-lg font-bold">Study Streak</h3>
-                <p className="mt-4 text-2xl font-bold">🔥 7 days</p>
-                <p className="mt-1 text-sm text-slate-500">Keep it up!</p>
-
-                <div className="mt-5 flex gap-3">
-                  {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => (
-                    <div key={`${day}-${index}`} className="text-center">
-                      <p className="mb-2 text-xs text-slate-500">{day}</p>
-                      <div
-                        className={`h-4 w-4 rounded-full ${
-                          index < 5 ? "bg-blue-600" : "bg-blue-100"
-                        }`}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </section>
             </aside>
           </div>
         </div>

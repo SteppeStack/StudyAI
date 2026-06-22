@@ -2,111 +2,150 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 export default function RegisterPage() {
   const router = useRouter();
 
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleRegister(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  async function handleRegister() {
+    if (!fullName.trim() || !email.trim() || !password.trim()) {
+      setErrorMessage("Please fill in all fields.");
+      return;
+    }
+
     setLoading(true);
-    setError("");
+    setErrorMessage("");
+    setSuccessMessage("");
 
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
     });
 
     if (error) {
-      setError(error.message);
+      setErrorMessage(error.message);
       setLoading(false);
       return;
     }
 
-    if (data.user && fullName.trim() !== "") {
+    if (data.user) {
       await supabase
         .from("profiles")
-        .update({ full_name: fullName })
+        .update({
+          full_name: fullName.trim(),
+        })
         .eq("id", data.user.id);
     }
 
+    setSuccessMessage("Account created successfully. You can now log in.");
     setLoading(false);
-    router.push("/login");
+
+    setTimeout(() => {
+      router.push("/login");
+    }, 1000);
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Create account</h1>
-        <p className="text-slate-500 mb-6">Start using StudyAI today.</p>
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 text-slate-900">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <Link
+          href="/"
+          className="mb-8 inline-block text-2xl font-bold text-slate-900"
+        >
+          StudyAI
+        </Link>
 
-        <form onSubmit={handleRegister} className="space-y-4">
+        <h1 className="text-3xl font-bold text-slate-900">Create account</h1>
+
+        <p className="mt-2 text-sm text-slate-500">
+          Join StudyAI and start learning smarter.
+        </p>
+
+        <div className="mt-8 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="mb-2 block text-sm font-medium text-slate-700">
               Full name
             </label>
+
             <input
               type="text"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder=""
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Your full name"
+              autoComplete="name"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="mb-2 block text-sm font-medium text-slate-700">
               Email
             </label>
+
             <input
               type="email"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="you@example.com"
-              required
+              autoComplete="email"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="mb-2 block text-sm font-medium text-slate-700">
               Password
             </label>
+
             <input
               type="password"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimum 6 characters"
-              required
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Create a password"
+              autoComplete="new-password"
             />
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {errorMessage && (
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+              {errorMessage}
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-medium text-green-600">
+              {successMessage}
+            </div>
+          )}
 
           <button
-            type="submit"
+            type="button"
+            onClick={handleRegister}
             disabled={loading}
-            className="w-full bg-blue-600 text-white rounded-lg py-2.5 font-medium hover:bg-blue-700 transition disabled:opacity-60"
+            className="w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Creating account..." : "Create account"}
           </button>
-        </form>
+        </div>
 
-        <p className="text-sm text-slate-500 mt-6 text-center">
+        <p className="mt-6 text-center text-sm text-slate-500">
           Already have an account?{" "}
-          <button
-            onClick={() => router.push("/login")}
-            className="text-blue-600 font-medium"
+          <Link
+            href="/login"
+            className="font-semibold text-blue-600 hover:text-blue-700"
           >
             Login
-          </button>
+          </Link>
         </p>
       </div>
     </main>

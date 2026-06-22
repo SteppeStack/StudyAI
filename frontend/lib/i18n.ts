@@ -1,0 +1,298 @@
+export type Language = "en" | "ru" | "kz";
+
+export const languages = [
+  { code: "en", label: "EN" },
+  { code: "ru", label: "RU" },
+  { code: "kz", label: "KZ" },
+] as const;
+
+export const translations = {
+  en: {
+    common: {
+      studyai: "StudyAI",
+      dashboard: "Dashboard",
+      aiTutor: "AI Tutor",
+      assignments: "Assignments",
+      diploma: "Diploma",
+      documents: "Documents",
+      examPrep: "Exam Prep",
+      files: "Files",
+      subscription: "Subscription",
+      settings: "Settings",
+      login: "Login",
+      register: "Register",
+      getStarted: "Get Started",
+      logout: "Logout",
+      backToDashboard: "Back to Dashboard",
+      comingSoon: "Coming soon",
+      menu: "Menu",
+      free: "Free",
+      student: "Student",
+      active: "Active",
+      loading: "Loading...",
+    },
+
+    dashboardPage: {
+      welcomeBack: "Welcome back",
+      subtitle: "Continue learning with your StudyAI workspace.",
+      search: "Search...",
+      yourPlan: "Your Plan",
+      currentPlan: "Current plan",
+      aiRequestsPerMonth: "AI requests per month",
+      manageSubscription: "Manage Subscription",
+      usageThisMonth: "Usage This Month",
+      aiRequests: "AI requests",
+      documents: "Documents",
+      chats: "Chats",
+      quickStats: "Quick Stats",
+      accountRole: "Account role",
+      planStatus: "Plan status",
+      workspace: "Workspace",
+      recentActivity: "Recent Activity",
+      recentActivitySubtitle: "Your latest StudyAI activity.",
+      viewAll: "View all",
+      noRecentActivity: "No recent activity yet.",
+      noRecentActivitySubtitle:
+        "Start using AI Tutor and your activity will appear here.",
+    },
+
+    tools: {
+      aiTutorTitle: "AI Tutor",
+      aiTutorDescription:
+        "Ask questions, get explanations, and study faster.",
+      assignmentsTitle: "Assignments",
+      assignmentsDescription:
+        "Organize homework tasks and academic deadlines.",
+      diplomaTitle: "Diploma",
+      diplomaDescription: "Plan, structure, and improve your thesis work.",
+      documentsTitle: "Documents",
+      documentsDescription:
+        "Generate summaries, notes, and study materials.",
+      examPrepTitle: "Exam Prep",
+      examPrepDescription: "Prepare for exams using guided study tools.",
+      filesTitle: "Files",
+      filesDescription: "Upload and manage your learning files.",
+    },
+
+    aiTutorPage: {
+      title: "AI Tutor",
+      chatTitle: "AI Tutor Chat",
+      assistantBadge: "StudyAI Assistant",
+      subtitle:
+        "Ask questions, save your learning history, and continue anytime.",
+      backToChats: "Back to chats",
+      newChat: "New Chat",
+      savedChats: "Saved chats",
+      noChats: "No chats yet.",
+      noChatsSubtitle: "Create your first AI Tutor chat to start learning.",
+      startLearning: "Start learning with AI Tutor",
+      startLearningSubtitle:
+        "Ask a question about your homework, exam topic, lecture notes, or any concept you want to understand better.",
+      promptOne: "Explain quadratic equations",
+      promptTwo: "Prepare for an exam",
+      promptThree: "Summarize a topic",
+      promptFour: "Create practice questions",
+      inputPlaceholder: "Ask AI Tutor something...",
+      send: "Send",
+      emptyMessage: "Start by sending your first question.",
+      aiComingSoon:
+        "AI response will be available after the next backend sprint.",
+      loadingChats: "Loading chats...",
+      loadingMessages: "Loading messages...",
+    },
+  },
+
+  ru: {
+    common: {
+      studyai: "StudyAI",
+      dashboard: "Панель",
+      aiTutor: "AI Репетитор",
+      assignments: "Задания",
+      diploma: "Диплом",
+      documents: "Документы",
+      examPrep: "Подготовка",
+      files: "Файлы",
+      subscription: "Подписка",
+      settings: "Настройки",
+      login: "Войти",
+      register: "Регистрация",
+      getStarted: "Начать",
+      logout: "Выйти",
+      backToDashboard: "Назад в панель",
+      comingSoon: "Скоро будет",
+      menu: "Меню",
+      free: "Бесплатный",
+      student: "Студент",
+      active: "Активен",
+      loading: "Загрузка...",
+    },
+
+    dashboardPage: {
+      welcomeBack: "С возвращением",
+      subtitle: "Продолжайте обучение в рабочем пространстве StudyAI.",
+      search: "Поиск...",
+      yourPlan: "Ваш план",
+      currentPlan: "Текущий план",
+      aiRequestsPerMonth: "AI запросов в месяц",
+      manageSubscription: "Управлять подпиской",
+      usageThisMonth: "Использование за месяц",
+      aiRequests: "AI запросы",
+      documents: "Документы",
+      chats: "Чаты",
+      quickStats: "Быстрая статистика",
+      accountRole: "Роль аккаунта",
+      planStatus: "Статус плана",
+      workspace: "Рабочая область",
+      recentActivity: "Недавняя активность",
+      recentActivitySubtitle: "Последняя активность в StudyAI.",
+      viewAll: "Смотреть всё",
+      noRecentActivity: "Пока нет активности.",
+      noRecentActivitySubtitle:
+        "Начните использовать AI Репетитор, и активность появится здесь.",
+    },
+
+    tools: {
+      aiTutorTitle: "AI Репетитор",
+      aiTutorDescription:
+        "Задавайте вопросы, получайте объяснения и учитесь быстрее.",
+      assignmentsTitle: "Задания",
+      assignmentsDescription:
+        "Организуйте домашние задания и учебные дедлайны.",
+      diplomaTitle: "Диплом",
+      diplomaDescription:
+        "Планируйте, структурируйте и улучшайте дипломную работу.",
+      documentsTitle: "Документы",
+      documentsDescription:
+        "Создавайте конспекты, заметки и учебные материалы.",
+      examPrepTitle: "Подготовка",
+      examPrepDescription:
+        "Готовьтесь к экзаменам с помощью учебных инструментов.",
+      filesTitle: "Файлы",
+      filesDescription: "Загружайте и управляйте учебными файлами.",
+    },
+
+    aiTutorPage: {
+      title: "AI Репетитор",
+      chatTitle: "Чат с AI Репетитором",
+      assistantBadge: "StudyAI Ассистент",
+      subtitle:
+        "Задавайте вопросы, сохраняйте историю обучения и продолжайте в любое время.",
+      backToChats: "Назад к чатам",
+      newChat: "Новый чат",
+      savedChats: "Сохранённые чаты",
+      noChats: "Пока нет чатов.",
+      noChatsSubtitle: "Создайте первый чат с AI Репетитором.",
+      startLearning: "Начните обучение с AI Репетитором",
+      startLearningSubtitle:
+        "Задайте вопрос по домашнему заданию, теме экзамена, лекциям или любой теме, которую хотите понять лучше.",
+      promptOne: "Объясни квадратные уравнения",
+      promptTwo: "Подготовь к экзамену",
+      promptThree: "Сделай краткий конспект",
+      promptFour: "Создай практические вопросы",
+      inputPlaceholder: "Спросите что-нибудь у AI Репетитора...",
+      send: "Отправить",
+      emptyMessage: "Начните с первого вопроса.",
+      aiComingSoon:
+        "Ответ AI будет доступен после следующего backend sprint.",
+      loadingChats: "Загрузка чатов...",
+      loadingMessages: "Загрузка сообщений...",
+    },
+  },
+
+  kz: {
+    common: {
+      studyai: "StudyAI",
+      dashboard: "Басты панель",
+      aiTutor: "AI Мұғалім",
+      assignments: "Тапсырмалар",
+      diploma: "Диплом",
+      documents: "Құжаттар",
+      examPrep: "Емтиханға дайындық",
+      files: "Файлдар",
+      subscription: "Жазылым",
+      settings: "Баптаулар",
+      login: "Кіру",
+      register: "Тіркелу",
+      getStarted: "Бастау",
+      logout: "Шығу",
+      backToDashboard: "Панельге қайту",
+      comingSoon: "Жақында",
+      menu: "Мәзір",
+      free: "Тегін",
+      student: "Студент",
+      active: "Белсенді",
+      loading: "Жүктелуде...",
+    },
+
+    dashboardPage: {
+      welcomeBack: "Қайта қош келдіңіз",
+      subtitle: "StudyAI жұмыс кеңістігінде оқуды жалғастырыңыз.",
+      search: "Іздеу...",
+      yourPlan: "Сіздің жоспарыңыз",
+      currentPlan: "Қазіргі жоспар",
+      aiRequestsPerMonth: "AI сұраныс айына",
+      manageSubscription: "Жазылымды басқару",
+      usageThisMonth: "Осы айдағы қолдану",
+      aiRequests: "AI сұраныстар",
+      documents: "Құжаттар",
+      chats: "Чаттар",
+      quickStats: "Қысқаша статистика",
+      accountRole: "Аккаунт рөлі",
+      planStatus: "Жоспар статусы",
+      workspace: "Жұмыс кеңістігі",
+      recentActivity: "Соңғы белсенділік",
+      recentActivitySubtitle: "StudyAI ішіндегі соңғы әрекеттеріңіз.",
+      viewAll: "Барлығын көру",
+      noRecentActivity: "Әзірге белсенділік жоқ.",
+      noRecentActivitySubtitle:
+        "AI Мұғалімді қолдана бастаңыз, белсенділік осы жерде пайда болады.",
+    },
+
+    tools: {
+      aiTutorTitle: "AI Мұғалім",
+      aiTutorDescription:
+        "Сұрақ қойып, түсінікті жауап алып, жылдам оқыңыз.",
+      assignmentsTitle: "Тапсырмалар",
+      assignmentsDescription:
+        "Үй тапсырмаларын және оқу мерзімдерін ұйымдастырыңыз.",
+      diplomaTitle: "Диплом",
+      diplomaDescription:
+        "Диплом жұмысын жоспарлап, құрылымын жақсартыңыз.",
+      documentsTitle: "Құжаттар",
+      documentsDescription:
+        "Конспект, жазба және оқу материалдарын жасаңыз.",
+      examPrepTitle: "Емтиханға дайындық",
+      examPrepDescription:
+        "Емтиханға дайындалу үшін оқу құралдарын қолданыңыз.",
+      filesTitle: "Файлдар",
+      filesDescription: "Оқу файлдарын жүктеп, басқарыңыз.",
+    },
+
+    aiTutorPage: {
+      title: "AI Мұғалім",
+      chatTitle: "AI Мұғалім чаты",
+      assistantBadge: "StudyAI Ассистент",
+      subtitle:
+        "Сұрақ қойып, оқу тарихын сақтап, кез келген уақытта жалғастырыңыз.",
+      backToChats: "Чаттарға қайту",
+      newChat: "Жаңа чат",
+      savedChats: "Сақталған чаттар",
+      noChats: "Әзірге чат жоқ.",
+      noChatsSubtitle: "Оқуды бастау үшін алғашқы AI чатын жасаңыз.",
+      startLearning: "AI Мұғаліммен оқуды бастаңыз",
+      startLearningSubtitle:
+        "Үй тапсырмасы, емтихан тақырыбы, дәріс жазбалары немесе түсінгіңіз келетін кез келген тақырып бойынша сұрақ қойыңыз.",
+      promptOne: "Квадрат теңдеулерді түсіндір",
+      promptTwo: "Емтиханға дайында",
+      promptThree: "Тақырыпты қысқаша түсіндір",
+      promptFour: "Практикалық сұрақтар жаса",
+      inputPlaceholder: "AI Мұғалімнен бір нәрсе сұраңыз...",
+      send: "Жіберу",
+      emptyMessage: "Алғашқы сұрағыңызды жіберіңіз.",
+      aiComingSoon:
+        "AI жауабы келесі backend sprint-тен кейін қолжетімді болады.",
+      loadingChats: "Чаттар жүктелуде...",
+      loadingMessages: "Хабарламалар жүктелуде...",
+    },
+  },
+};
