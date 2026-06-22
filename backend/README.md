@@ -24,7 +24,6 @@ backend/
     app/
     tests/
   supabase/
-    README.md
     migrations/
 ```
 
@@ -84,8 +83,27 @@ They create:
 - profile auto-creation after signup;
 - RLS policies for reading/updating only the current user's profile.
 
-Detailed Supabase setup instructions are in:
+## Sprint 2: AI Tutor Data Model
+
+Sprint 2 migrations create:
 
 ```text
-backend/supabase/README.md
+public.ai_conversations
+public.ai_messages
+```
+
+The browser client can create a conversation and insert only `user` messages for its own conversations. It cannot insert messages with the `assistant` or `system` role. A future Python API endpoint will call the AI provider and write assistant messages server-side.
+
+Run these migrations in Supabase SQL Editor after the Sprint 1 migrations, in this exact order:
+
+```text
+202606220001_create_ai_conversations.sql
+202606220002_create_ai_messages.sql
+202606220003_enable_ai_tutor_rls.sql
+```
+
+Manual Thunder Client checks are documented in:
+
+```text
+backend/supabase/AI_TUTOR_TESTING.md
 ```
