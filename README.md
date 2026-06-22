@@ -56,7 +56,7 @@ This keeps the database as the source of truth and prevents hidden manual change
 
 ## Current Sprint
 
-Sprint 2: AI Tutor data model
+Sprint 3: Dashboard data and subscriptions
 
 Goal:
 
@@ -65,6 +65,7 @@ Goal:
 - Users can read only their own AI Tutor messages.
 - Users can create only messages with the `user` role.
 - Assistant messages will be created later by the Python API.
+- Plans, subscriptions, monthly usage, and activity events are available for the dashboard.
 
 ## Repository Rules
 
