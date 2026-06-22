@@ -2,7 +2,7 @@
 
 StudyAI is split into two independent work areas:
 
-- `backend/` - Supabase backend, database schema, auth, RLS policies, migrations.
+- `backend/` - Supabase schema/auth/RLS/migrations and the Python API for server-only features.
 - `frontend/` - Next.js frontend, pages, UI, Supabase client integration.
 
 ## Team Responsibilities
@@ -12,6 +12,7 @@ Backend developer:
 - Works only inside `backend/`.
 - Creates and updates Supabase migrations.
 - Applies migrations to the shared Supabase project.
+- Owns the FastAPI service in `backend/api/` for server-only operations such as AI requests.
 - Documents new tables, fields, policies, and required frontend env values.
 - Does not edit frontend code unless the team agrees first.
 
@@ -19,7 +20,7 @@ Frontend developer:
 
 - Works only inside `frontend/`.
 - Builds pages, components, forms, and client-side Supabase integration.
-- Uses the public Supabase URL and anon key provided by the backend developer.
+- Uses the public Supabase URL and publishable key provided by the backend developer.
 - Does not edit database schema, RLS policies, or backend migrations unless the team agrees first.
 
 ## Shared Supabase Project
@@ -30,7 +31,7 @@ The backend developer can share these values with the frontend developer:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 ```
 
 The backend developer must not share this value with frontend code:
@@ -55,14 +56,15 @@ This keeps the database as the source of truth and prevents hidden manual change
 
 ## Current Sprint
 
-Sprint 1: Supabase Auth + profiles + RLS
+Sprint 2: AI Tutor data model
 
 Goal:
 
-- Users can sign up with email/password.
-- A `profiles` row is created automatically for every new auth user.
-- Users can read and update only their own profile.
-- Users cannot change protected fields such as `subscription_plan`.
+- Sprint 1 is complete: Auth, `profiles`, and RLS.
+- Users can create and manage only their own AI Tutor conversations.
+- Users can read only their own AI Tutor messages.
+- Users can create only messages with the `user` role.
+- Assistant messages will be created later by the Python API.
 
 ## Repository Rules
 

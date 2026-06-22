@@ -1,0 +1,21 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.core.config import cors_origins
+from app.routers.health import router as health_router
+
+app = FastAPI(
+    title="StudyAI API",
+    version="0.1.0",
+    description="Server-side API for StudyAI features that must not run in the browser.",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(health_router)
