@@ -107,3 +107,36 @@ Manual Thunder Client checks are documented in:
 ```text
 backend/supabase/AI_TUTOR_TESTING.md
 ```
+
+## Sprint 3: Dashboard Data and Subscriptions
+
+Sprint 3 migrations add:
+
+```text
+profiles.account_role
+plans
+subscriptions
+monthly_usage
+activity_events
+```
+
+Run the following migrations in Supabase SQL Editor after Sprint 2:
+
+```text
+202606220004_add_profile_account_role.sql
+202606220005_create_plans_and_subscriptions.sql
+202606220006_create_dashboard_usage_and_activity.sql
+202606220007_enable_dashboard_rls_and_bootstrap.sql
+```
+
+The frontend contract is in:
+
+```text
+backend/supabase/DASHBOARD_API_CONTRACT.md
+```
+
+Thunder Client verification steps are in:
+
+```text
+backend/supabase/DASHBOARD_TESTING.md
+```
