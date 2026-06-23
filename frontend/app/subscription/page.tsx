@@ -1,337 +1,730 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import AppSidebar from "@/components/AppSidebar";
-import { useLanguage } from "@/components/LanguageProvider";
-import { supabase } from "@/lib/supabase";
-import {
-  getCurrentSubscription,
-  getPlans,
-  type Plan,
-  type Subscription,
-} from "@/lib/dashboardData";
+import { useEffect, useMemo, useState } from "react";
+import AppShell from "@/components/AppShell";
 
-const pageText = {
+type Language = "en" | "ru" | "kz";
+type Theme = "light" | "dark";
+type BillingPeriod = "monthly" | "yearly";
+type PlanKey = "free" | "pro" | "premium";
+
+type Plan = {
+  key: PlanKey;
+  icon: string;
+  monthlyPrice: string;
+  yearlyPrice: string;
+  credits: string;
+  popular?: boolean;
+};
+
+type Copy = {
+  pageBadge: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  monthly: string;
+  yearly: string;
+  perMonth: string;
+  perYear: string;
+  mostPopular: string;
+  currentPlan: string;
+  upgradeTo: string;
+  planComparison: string;
+  planComparisonSubtitle: string;
+  included: string;
+  notIncluded: string;
+  credits: string;
+  aiTutor: string;
+  documents: string;
+  examPrep: string;
+  files: string;
+  priority: string;
+  paymentNoteTitle: string;
+  paymentNoteText: string;
+  manageTitle: string;
+  manageSubtitle: string;
+  manageBilling: string;
+  plans: Record<
+    PlanKey,
+    {
+      name: string;
+      description: string;
+      features: string[];
+    }
+  >;
+};
+
+const copy: Record<Language, Copy> = {
   en: {
-    title: "Subscription",
-    subtitle: "Choose the plan that fits your study workflow.",
-    backToDashboard: "Back to Dashboard",
-    currentPlan: "Current Plan",
-    status: "Status",
-    active: "Active",
-    aiRequestsMonth: "AI requests / month",
-    for: "For",
-    all: "All",
-    student: "Student",
-    teacher: "Teacher",
-    month: "month",
-    dailyLimit: "Daily AI limit",
-    monthlyLimit: "Monthly AI limit",
-    currency: "Currency",
-    current: "Current",
-    currentPlanButton: "Current Plan",
-    goToPayment: "Go to Payment",
-    loading: "Loading subscription...",
-    noPlans: "No plans found.",
-    free: "Free",
-    studentPremium: "Student Premium",
-    teacherPlan: "Teacher Plan",
+    pageBadge: "StudyAI Plans",
+    heroTitle: "Upgrade your academic workspace",
+    heroSubtitle:
+      "Get more AI credits, advanced study tools, document generation, exam preparation, and file-powered learning features.",
+    monthly: "Monthly",
+    yearly: "Yearly",
+    perMonth: "per month",
+    perYear: "per year",
+    mostPopular: "Most popular",
+    currentPlan: "Current plan",
+    upgradeTo: "Upgrade to",
+    planComparison: "Plan comparison",
+    planComparisonSubtitle:
+      "Choose the plan that fits your current study workflow.",
+    included: "Included",
+    notIncluded: "Not included",
+    credits: "AI credits",
+    aiTutor: "AI Tutor",
+    documents: "Documents",
+    examPrep: "Exam Prep",
+    files: "Files",
+    priority: "Priority features",
+    paymentNoteTitle: "Secure payment preview",
+    paymentNoteText:
+      "Payment integration will be connected later through backend/API. For now, this is a frontend subscription preview.",
+    manageTitle: "Manage your plan",
+    manageSubtitle:
+      "View billing options, compare plans, and upgrade when you need more AI credits.",
+    manageBilling: "Go to payment",
+    plans: {
+      free: {
+        name: "Free",
+        description: "For trying StudyAI and using basic academic tools.",
+        features: [
+          "Basic AI Tutor access",
+          "Limited document drafts",
+          "Basic assignment helper",
+          "Manual file organization",
+          "Light and dark theme",
+        ],
+      },
+      pro: {
+        name: "Pro",
+        description: "For active students who use StudyAI every week.",
+        features: [
+          "Full AI Tutor conversations",
+          "More document generations",
+          "Advanced assignment feedback",
+          "Exam prep plans and quizzes",
+          "File-based study support",
+          "Priority workspace features",
+        ],
+      },
+      premium: {
+        name: "Premium",
+        description: "For heavy academic work, thesis writing, and exam periods.",
+        features: [
+          "Maximum AI Tutor usage",
+          "Longer document generation",
+          "Diploma assistant support",
+          "Advanced exam preparation",
+          "Large file workspace",
+          "Future premium AI tools",
+        ],
+      },
+    },
   },
-
   ru: {
-    title: "Подписка",
-    subtitle: "Выберите план, который подходит для вашего обучения.",
-    backToDashboard: "Назад в панель",
+    pageBadge: "StudyAI Plans",
+    heroTitle: "Улучши свой учебный workspace",
+    heroSubtitle:
+      "Получай больше AI-кредитов, продвинутые учебные инструменты, генерацию документов, подготовку к экзаменам и обучение на основе файлов.",
+    monthly: "Ежемесячно",
+    yearly: "Ежегодно",
+    perMonth: "в месяц",
+    perYear: "в год",
+    mostPopular: "Популярный",
     currentPlan: "Текущий план",
-    status: "Статус",
-    active: "Активен",
-    aiRequestsMonth: "AI запросов / месяц",
-    for: "Для",
-    all: "всех",
-    student: "студентов",
-    teacher: "преподавателей",
-    month: "месяц",
-    dailyLimit: "Дневной лимит AI",
-    monthlyLimit: "Месячный лимит AI",
-    currency: "Валюта",
-    current: "Текущий",
-    currentPlanButton: "Текущий план",
-    goToPayment: "Перейти к оплате",
-    loading: "Загрузка подписки...",
-    noPlans: "Планы не найдены.",
-    free: "Бесплатный",
-    studentPremium: "Студент Premium",
-    teacherPlan: "План для преподавателя",
+    upgradeTo: "Перейти на",
+    planComparison: "Сравнение планов",
+    planComparisonSubtitle:
+      "Выбери план, который подходит твоему учебному workflow.",
+    included: "Есть",
+    notIncluded: "Нет",
+    credits: "AI-кредиты",
+    aiTutor: "AI Tutor",
+    documents: "Документы",
+    examPrep: "Экзамены",
+    files: "Файлы",
+    priority: "Приоритетные функции",
+    paymentNoteTitle: "Безопасная оплата",
+    paymentNoteText:
+      "Интеграция оплаты будет подключена позже через backend/API. Сейчас это frontend-preview подписки.",
+    manageTitle: "Управление планом",
+    manageSubtitle:
+      "Смотри варианты оплаты, сравнивай планы и улучшай подписку, когда нужно больше AI-кредитов.",
+    manageBilling: "Перейти к оплате",
+    plans: {
+      free: {
+        name: "Free",
+        description: "Для знакомства со StudyAI и базовых учебных инструментов.",
+        features: [
+          "Базовый доступ к AI Tutor",
+          "Ограниченные черновики документов",
+          "Базовая помощь с заданиями",
+          "Ручная организация файлов",
+          "Светлая и тёмная тема",
+        ],
+      },
+      pro: {
+        name: "Pro",
+        description: "Для активных студентов, которые используют StudyAI каждую неделю.",
+        features: [
+          "Полные диалоги с AI Tutor",
+          "Больше генераций документов",
+          "Продвинутая обратная связь по заданиям",
+          "Планы подготовки и тесты к экзаменам",
+          "Учёба на основе загруженных файлов",
+          "Приоритетные функции workspace",
+        ],
+      },
+      premium: {
+        name: "Premium",
+        description:
+          "Для интенсивной учёбы, дипломной работы и периода экзаменов.",
+        features: [
+          "Максимальное использование AI Tutor",
+          "Длинная генерация документов",
+          "Поддержка дипломного ассистента",
+          "Продвинутая подготовка к экзаменам",
+          "Большое файловое пространство",
+          "Будущие premium AI-инструменты",
+        ],
+      },
+    },
   },
-
   kz: {
-    title: "Жазылым",
-    subtitle: "Оқуыңызға сәйкес келетін жоспарды таңдаңыз.",
-    backToDashboard: "Панельге қайту",
-    currentPlan: "Қазіргі жоспар",
-    status: "Статус",
-    active: "Белсенді",
-    aiRequestsMonth: "AI сұраныс / ай",
-    for: "Арналған",
-    all: "барлығына",
-    student: "студенттерге",
-    teacher: "мұғалімдерге",
-    month: "ай",
-    dailyLimit: "Күндік AI лимит",
-    monthlyLimit: "Айлық AI лимит",
-    currency: "Валюта",
-    current: "Қазіргі",
-    currentPlanButton: "Қазіргі жоспар",
-    goToPayment: "Төлемге өту",
-    loading: "Жазылым жүктелуде...",
-    noPlans: "Жоспарлар табылмады.",
-    free: "Тегін",
-    studentPremium: "Студент Premium",
-    teacherPlan: "Мұғалім жоспары",
+    pageBadge: "StudyAI Plans",
+    heroTitle: "Оқу workspace деңгейін көтеріңіз",
+    heroSubtitle:
+      "Көбірек AI-кредиттер, кеңейтілген оқу құралдары, құжат генерациясы, емтиханға дайындық және файлдарға негізделген оқу мүмкіндіктерін алыңыз.",
+    monthly: "Ай сайын",
+    yearly: "Жыл сайын",
+    perMonth: "айына",
+    perYear: "жылына",
+    mostPopular: "Ең танымал",
+    currentPlan: "Ағымдағы жоспар",
+    upgradeTo: "Көшу:",
+    planComparison: "Жоспарларды салыстыру",
+    planComparisonSubtitle:
+      "Оқу workflow үшін ыңғайлы жоспарды таңдаңыз.",
+    included: "Бар",
+    notIncluded: "Жоқ",
+    credits: "AI-кредиттер",
+    aiTutor: "AI Tutor",
+    documents: "Құжаттар",
+    examPrep: "Емтихандар",
+    files: "Файлдар",
+    priority: "Приоритет функциялар",
+    paymentNoteTitle: "Қауіпсіз төлем preview",
+    paymentNoteText:
+      "Төлем интеграциясы кейін backend/API арқылы қосылады. Қазір бұл subscription frontend-preview.",
+    manageTitle: "Жоспарды басқару",
+    manageSubtitle:
+      "Төлем нұсқаларын қарап, жоспарларды салыстырып, көбірек AI-кредит қажет болғанда жаңартыңыз.",
+    manageBilling: "Төлемге өту",
+    plans: {
+      free: {
+        name: "Free",
+        description:
+          "StudyAI-ды сынап көру және базалық оқу құралдарын қолдану үшін.",
+        features: [
+          "AI Tutor базалық қолжетімділігі",
+          "Шектеулі құжат черновиктері",
+          "Тапсырмаларға базалық көмек",
+          "Файлдарды қолмен ұйымдастыру",
+          "Жарық және қараңғы тема",
+        ],
+      },
+      pro: {
+        name: "Pro",
+        description:
+          "StudyAI-ды әр апта қолданатын белсенді студенттер үшін.",
+        features: [
+          "AI Tutor толық диалогтары",
+          "Көбірек құжат генерациясы",
+          "Тапсырмаларға кеңейтілген feedback",
+          "Емтихан жоспарлары және тесттер",
+          "Файлдарға негізделген оқу",
+          "Workspace приоритет функциялары",
+        ],
+      },
+      premium: {
+        name: "Premium",
+        description:
+          "Интенсивті оқу, диплом жұмысы және емтихан кезеңдері үшін.",
+        features: [
+          "AI Tutor максималды қолдану",
+          "Ұзақ құжат генерациясы",
+          "Диплом ассистенті",
+          "Кеңейтілген емтихан дайындығы",
+          "Үлкен файл workspace",
+          "Болашақ premium AI құралдары",
+        ],
+      },
+    },
   },
 };
 
-export default function SubscriptionPage() {
-  const router = useRouter();
-  const { language } = useLanguage();
-  const text = pageText[language];
+const plans: Plan[] = [
+  {
+    key: "free",
+    icon: "🌱",
+    monthlyPrice: "€0",
+    yearlyPrice: "€0",
+    credits: "100",
+  },
+  {
+    key: "pro",
+    icon: "⚡",
+    monthlyPrice: "$7.99",
+    yearlyPrice: "€76.70",
+    credits: "4,000",
+    popular: true,
+  },
+  {
+    key: "premium",
+    icon: "🚀",
+    monthlyPrice: "€14.99",
+    yearlyPrice: "€143.90",
+    credits: "10,000",
+  },
+];
 
-  const [loading, setLoading] = useState(true);
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
+const comparisonRows = [
+  {
+    key: "credits",
+    free: "100",
+    pro: "4,000",
+    premium: "10,000",
+  },
+  {
+    key: "aiTutor",
+    free: true,
+    pro: true,
+    premium: true,
+  },
+  {
+    key: "documents",
+    free: false,
+    pro: true,
+    premium: true,
+  },
+  {
+    key: "examPrep",
+    free: false,
+    pro: true,
+    premium: true,
+  },
+  {
+    key: "files",
+    free: false,
+    pro: true,
+    premium: true,
+  },
+  {
+    key: "priority",
+    free: false,
+    pro: true,
+    premium: true,
+  },
+] as const;
+
+const languageStorageKeys = [
+  "studyai-language",
+  "studyai_lang",
+  "language",
+  "locale",
+];
+
+const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
+
+function getStoredLanguage(): Language {
+  if (typeof window === "undefined") return "ru";
+
+  for (const key of languageStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "en" || value === "ru" || value === "kz") {
+      return value;
+    }
+  }
+
+  return "ru";
+}
+
+function getStoredTheme(): Theme {
+  if (typeof window === "undefined") return "dark";
+
+  for (const key of themeStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "light" || value === "dark") {
+      return value;
+    }
+  }
+
+  return "dark";
+}
+
+function getComparisonLabel(key: string, t: Copy) {
+  if (key === "credits") return t.credits;
+  if (key === "aiTutor") return t.aiTutor;
+  if (key === "documents") return t.documents;
+  if (key === "examPrep") return t.examPrep;
+  if (key === "files") return t.files;
+  return t.priority;
+}
+
+function renderComparisonValue(value: boolean | string, t: Copy) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return value ? t.included : t.notIncluded;
+}
+
+function SubscriptionContent() {
+  const [language, setLanguage] = useState<Language>("ru");
+  const [theme, setTheme] = useState<Theme>("dark");
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
+
+  const t = copy[language];
+  const isDark = theme === "dark";
 
   useEffect(() => {
-    async function loadSubscriptionPage() {
-      const { data: sessionData } = await supabase.auth.getSession();
+    setLanguage(getStoredLanguage());
+    setTheme(getStoredTheme());
 
-      if (!sessionData.session) {
-        router.push("/login");
-        return;
+    function handleLanguageChange(event: Event) {
+      const customEvent = event as CustomEvent<Language>;
+
+      if (
+        customEvent.detail === "en" ||
+        customEvent.detail === "ru" ||
+        customEvent.detail === "kz"
+      ) {
+        setLanguage(customEvent.detail);
       }
-
-      const { data: plansData } = await getPlans();
-      const { data: subscriptionData } = await getCurrentSubscription();
-
-      setPlans((plansData || []) as Plan[]);
-      setSubscription(subscriptionData as Subscription | null);
-      setLoading(false);
     }
 
-    loadSubscriptionPage();
-  }, [router]);
+    function handleThemeChange(event: Event) {
+      const customEvent = event as CustomEvent<Theme>;
 
-  const currentPlanRaw = subscription?.plans;
-  const currentPlanFromSubscription = Array.isArray(currentPlanRaw)
-    ? currentPlanRaw[0]
-    : currentPlanRaw;
-
-  const currentPlan =
-    currentPlanFromSubscription ||
-    plans.find((plan) => plan.monthly_price_cents === 0) ||
-    plans[0] ||
-    null;
-
-  function formatPrice(priceCents: number) {
-    const price = priceCents / 100;
-
-    if (price === 0) {
-      return "$0";
+      if (customEvent.detail === "light" || customEvent.detail === "dark") {
+        setTheme(customEvent.detail);
+      }
     }
 
-    return `$${price.toFixed(2)}`;
-  }
+    function handleStorageChange() {
+      setLanguage(getStoredLanguage());
+      setTheme(getStoredTheme());
+    }
 
-  function getPlanName(plan: Plan) {
-    const name = plan.display_name.toLowerCase();
+    window.addEventListener("studyai:language-change", handleLanguageChange);
+    window.addEventListener("studyai:theme-change", handleThemeChange);
+    window.addEventListener("storage", handleStorageChange);
 
-    if (name.includes("free")) return text.free;
-    if (name.includes("student")) return text.studentPremium;
-    if (name.includes("teacher")) return text.teacherPlan;
+    return () => {
+      window.removeEventListener(
+        "studyai:language-change",
+        handleLanguageChange
+      );
+      window.removeEventListener("studyai:theme-change", handleThemeChange);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
 
-    return plan.display_name;
-  }
+  const pageClass = isDark
+    ? "min-h-full bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8"
+    : "min-h-full bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8";
 
-  function getAudience(audience: string) {
-    const value = audience.toLowerCase();
+  const cardClass = isDark
+    ? "border-white/10 bg-slate-900/70 shadow-sm"
+    : "border-slate-200 bg-white shadow-sm";
 
-    if (value.includes("all")) return text.all;
-    if (value.includes("student")) return text.student;
-    if (value.includes("teacher")) return text.teacher;
+  const softCardClass = isDark
+    ? "border-white/10 bg-slate-950/50"
+    : "border-slate-200 bg-slate-50";
 
-    return audience;
-  }
+  const titleClass = isDark ? "text-white" : "text-slate-950";
+  const textClass = isDark ? "text-slate-300" : "text-slate-600";
+  const mutedClass = isDark ? "text-slate-400" : "text-slate-500";
 
-  function getPaymentUrl(plan: Plan) {
-    const name = plan.display_name.toLowerCase();
-
-    if (name.includes("teacher")) return "/payment?plan=teacher";
-    if (name.includes("student")) return "/payment?plan=student";
-    if (name.includes("free")) return "/payment?plan=free";
-
-    return "/payment";
-  }
-
-  function isCurrentPlan(plan: Plan) {
-    if (!currentPlan) return false;
-    return plan.id === currentPlan.id;
-  }
-
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-50 text-slate-900">
-        <AppSidebar />
-
-        <section className="min-h-screen px-4 pt-20 lg:ml-[300px] lg:flex lg:items-center lg:justify-center lg:pt-0">
-          <div className="rounded-2xl border border-slate-200 bg-white px-8 py-6 shadow-sm">
-            <p className="text-sm font-medium text-slate-600">
-              {text.loading}
-            </p>
-          </div>
-        </section>
-      </main>
-    );
-  }
+  const planCards = useMemo(() => plans, []);
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <AppSidebar />
+    <div className={pageClass}>
+      <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6">
+        <section
+          className={`overflow-hidden rounded-[2rem] border p-5 sm:p-6 lg:p-8 ${cardClass}`}
+        >
+          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
+            <div className="min-w-0">
+              <div
+                className={`mb-5 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${
+                  isDark
+                    ? "border-blue-400/20 bg-blue-400/10 text-blue-200"
+                    : "border-blue-100 bg-blue-50 text-blue-700"
+                }`}
+              >
+                💳 {t.pageBadge}
+              </div>
 
-      <section className="min-h-screen px-4 pb-8 pt-20 sm:px-6 lg:ml-[300px] lg:px-10 lg:py-10">
-        <div className="mx-auto w-full max-w-[1680px]">
-          <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">{text.title}</h1>
-              <p className="mt-2 text-slate-500">{text.subtitle}</p>
+              <h1
+                className={`max-w-4xl text-3xl font-black tracking-tight sm:text-4xl ${titleClass}`}
+              >
+                {t.heroTitle}
+              </h1>
+
+              <p
+                className={`mt-4 max-w-4xl text-sm leading-7 sm:text-base ${textClass}`}
+              >
+                {t.heroSubtitle}
+              </p>
             </div>
 
-            <Link
-              href="/dashboard"
-              className="w-fit rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            <div
+              className={`inline-flex w-fit rounded-3xl border p-1 ${
+                isDark
+                  ? "border-white/10 bg-slate-950/70"
+                  : "border-slate-200 bg-slate-100"
+              }`}
             >
-              {text.backToDashboard}
-            </Link>
-          </header>
-
-          {currentPlan && (
-            <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-500">
-                    {text.currentPlan}
-                  </p>
-
-                  <h2 className="mt-2 text-2xl font-bold">
-                    {getPlanName(currentPlan)}
-                  </h2>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    {text.status}: {text.active}
-                  </p>
-                </div>
-
-                <div className="w-fit rounded-full bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-600">
-                  {currentPlan.monthly_ai_request_limit || 0}{" "}
-                  {text.aiRequestsMonth}
-                </div>
-              </div>
-            </section>
-          )}
-
-          {plans.length === 0 ? (
-            <section className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
-              <p className="font-semibold text-slate-700">{text.noPlans}</p>
-            </section>
-          ) : (
-            <section className="grid grid-cols-1 gap-6 lg:grid-cols-2 2xl:grid-cols-3">
-              {plans.map((plan) => {
-                const current = isCurrentPlan(plan);
+              {(["monthly", "yearly"] as BillingPeriod[]).map((period) => {
+                const active = billingPeriod === period;
 
                 return (
-                  <div
-                    key={plan.id}
-                    className={
-                      current
-                        ? "rounded-3xl border-2 border-blue-600 bg-white p-8 shadow-sm"
-                        : "rounded-3xl border border-slate-200 bg-white p-8 shadow-sm"
-                    }
+                  <button
+                    key={period}
+                    type="button"
+                    onClick={() => setBillingPeriod(period)}
+                    className={`h-12 rounded-2xl px-5 text-sm font-black transition ${
+                      active
+                        ? "bg-blue-600 text-white shadow-sm shadow-blue-600/20"
+                        : isDark
+                          ? "text-slate-300 hover:bg-white/10"
+                          : "text-slate-600 hover:bg-white"
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h2 className="text-2xl font-bold">
-                          {getPlanName(plan)}
-                        </h2>
-
-                        <p className="mt-2 text-sm text-slate-500">
-                          {text.for} {getAudience(plan.audience)}
-                        </p>
-                      </div>
-
-                      {current && (
-                        <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600">
-                          {text.current}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-8 flex items-end gap-2">
-                      <span className="text-4xl font-bold">
-                        {formatPrice(plan.monthly_price_cents)}
-                      </span>
-
-                      <span className="pb-1 text-sm text-slate-500">
-                        /{text.month}
-                      </span>
-                    </div>
-
-                    <div className="mt-8 space-y-5 text-sm">
-                      <div className="flex justify-between gap-4">
-                        <span className="text-slate-500">
-                          {text.dailyLimit}
-                        </span>
-                        <span className="font-bold">
-                          {plan.daily_ai_request_limit || "-"}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between gap-4">
-                        <span className="text-slate-500">
-                          {text.monthlyLimit}
-                        </span>
-                        <span className="font-bold">
-                          {plan.monthly_ai_request_limit || "-"}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between gap-4">
-                        <span className="text-slate-500">{text.currency}</span>
-                        <span className="font-bold">{plan.currency}</span>
-                      </div>
-                    </div>
-
-                    {current ? (
-                      <button
-                        disabled
-                        className="mt-8 w-full cursor-not-allowed rounded-xl bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-400"
-                      >
-                        {text.currentPlanButton}
-                      </button>
-                    ) : (
-                      <Link
-                        href={getPaymentUrl(plan)}
-                        className="mt-8 block w-full rounded-xl bg-blue-600 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-blue-700"
-                      >
-                        {text.goToPayment}
-                      </Link>
-                    )}
-                  </div>
+                    {period === "monthly" ? t.monthly : t.yearly}
+                  </button>
                 );
               })}
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-3">
+          {planCards.map((plan) => {
+            const planCopy = t.plans[plan.key];
+            const price =
+              billingPeriod === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
+            const periodLabel =
+              billingPeriod === "monthly" ? t.perMonth : t.perYear;
+            const isCurrentPlan = plan.key === "free";
+
+            return (
+              <article
+                key={plan.key}
+                className={`relative overflow-hidden rounded-[2rem] border p-5 sm:p-6 ${
+                  plan.popular
+                    ? isDark
+                      ? "border-blue-400/60 bg-slate-900/70 shadow-sm shadow-blue-600/10"
+                      : "border-blue-300 bg-white shadow-sm shadow-blue-200"
+                    : cardClass
+                }`}
+              >
+                {plan.popular && (
+                  <span className="absolute right-5 top-5 rounded-full bg-blue-600 px-4 py-1 text-xs font-black text-white">
+                    {t.mostPopular}
+                  </span>
+                )}
+
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600/10 text-2xl">
+                  {plan.icon}
+                </div>
+
+                <h2 className={`mt-6 text-2xl font-black ${titleClass}`}>
+                  {planCopy.name}
+                </h2>
+
+                <p className={`mt-3 min-h-14 text-sm leading-6 ${textClass}`}>
+                  {planCopy.description}
+                </p>
+
+                <div className="mt-7">
+                  <span className={`text-4xl font-black ${titleClass}`}>
+                    {price}
+                  </span>
+
+                  <span className={`ml-2 text-sm font-bold ${mutedClass}`}>
+                    {periodLabel}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-sm font-black text-blue-500">
+                  {plan.credits} {t.credits}
+                </p>
+
+                <Link
+                  href={
+                    isCurrentPlan
+                      ? "/dashboard"
+                      : `/payment?plan=${plan.key}&billing=${billingPeriod}`
+                  }
+                  className={`mt-6 inline-flex h-12 w-full items-center justify-center rounded-2xl border px-5 text-sm font-black transition ${
+                    isCurrentPlan
+                      ? isDark
+                        ? "border-white/10 bg-slate-950/60 text-slate-100 hover:bg-white/10"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      : "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20 hover:bg-blue-700"
+                  }`}
+                >
+                  {isCurrentPlan
+                    ? t.currentPlan
+                    : `${t.upgradeTo} ${planCopy.name}`}
+                </Link>
+
+                <div className="mt-6 grid gap-3">
+                  {planCopy.features.map((feature) => (
+                    <div key={feature} className="flex gap-3">
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-black text-emerald-500">
+                        ✓
+                      </span>
+
+                      <p className={`text-sm leading-6 ${textClass}`}>
+                        {feature}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            );
+          })}
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className={`rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
+            <h2 className={`text-xl font-black ${titleClass}`}>
+              {t.planComparison}
+            </h2>
+
+            <p className={`mt-2 text-sm leading-6 ${textClass}`}>
+              {t.planComparisonSubtitle}
+            </p>
+
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full min-w-[720px] border-separate border-spacing-y-3">
+                <thead>
+                  <tr>
+                    <th className={`px-4 py-2 text-left text-sm ${mutedClass}`}>
+                      Feature
+                    </th>
+                    <th className={`px-4 py-2 text-left text-sm ${mutedClass}`}>
+                      Free
+                    </th>
+                    <th className={`px-4 py-2 text-left text-sm ${mutedClass}`}>
+                      Pro
+                    </th>
+                    <th className={`px-4 py-2 text-left text-sm ${mutedClass}`}>
+                      Premium
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {comparisonRows.map((row) => (
+                    <tr key={row.key}>
+                      <td
+                        className={`rounded-l-2xl border-y border-l px-4 py-4 text-sm font-black ${
+                          isDark
+                            ? "border-white/10 bg-slate-950/50 text-white"
+                            : "border-slate-200 bg-slate-50 text-slate-950"
+                        }`}
+                      >
+                        {getComparisonLabel(row.key, t)}
+                      </td>
+
+                      <td
+                        className={`border-y px-4 py-4 text-sm font-bold ${
+                          isDark
+                            ? "border-white/10 bg-slate-950/50 text-slate-300"
+                            : "border-slate-200 bg-slate-50 text-slate-600"
+                        }`}
+                      >
+                        {renderComparisonValue(row.free, t)}
+                      </td>
+
+                      <td
+                        className={`border-y px-4 py-4 text-sm font-bold ${
+                          isDark
+                            ? "border-white/10 bg-slate-950/50 text-slate-300"
+                            : "border-slate-200 bg-slate-50 text-slate-600"
+                        }`}
+                      >
+                        {renderComparisonValue(row.pro, t)}
+                      </td>
+
+                      <td
+                        className={`rounded-r-2xl border-y border-r px-4 py-4 text-sm font-bold ${
+                          isDark
+                            ? "border-white/10 bg-slate-950/50 text-slate-300"
+                            : "border-slate-200 bg-slate-50 text-slate-600"
+                        }`}
+                      >
+                        {renderComparisonValue(row.premium, t)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <aside className="grid gap-6">
+            <section className={`rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600/10 text-2xl">
+                🔐
+              </div>
+
+              <h2 className={`mt-5 text-xl font-black ${titleClass}`}>
+                {t.paymentNoteTitle}
+              </h2>
+
+              <p className={`mt-2 text-sm leading-6 ${textClass}`}>
+                {t.paymentNoteText}
+              </p>
             </section>
-          )}
-        </div>
-      </section>
-    </main>
+
+            <section className="rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-600 p-6 text-white shadow-sm shadow-blue-600/20">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-2xl">
+                ⚡
+              </div>
+
+              <h2 className="mt-5 text-xl font-black">{t.manageTitle}</h2>
+
+              <p className="mt-2 text-sm font-medium leading-6 text-blue-100">
+                {t.manageSubtitle}
+              </p>
+
+              <Link
+                href="/payment"
+                className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-white text-sm font-black text-blue-700 transition hover:bg-blue-50"
+              >
+                {t.manageBilling}
+              </Link>
+            </section>
+          </aside>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export default function SubscriptionPage() {
+  return (
+    <AppShell>
+      <SubscriptionContent />
+    </AppShell>
   );
 }

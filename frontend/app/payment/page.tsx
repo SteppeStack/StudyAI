@@ -1,457 +1,606 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import AppShell, { type AppLanguage } from "@/components/AppShell";
 import Link from "next/link";
-import AppSidebar from "@/components/AppSidebar";
-import { useLanguage } from "@/components/LanguageProvider";
+import { useMemo, useState } from "react";
 
-const pageText = {
+type PlanKey = "pro" | "premium";
+type BillingCycle = "monthly" | "yearly";
+type PaymentMethod = "card" | "paypal" | "bank";
+
+const paymentText = {
   en: {
     title: "Payment",
-    subtitle: "Complete your subscription upgrade.",
-    backToSubscription: "Back to Subscription",
-    paymentDetails: "Payment Details",
-    paymentSubtitle:
-      "This is a frontend payment page for MVP. Real payment processing will be connected later.",
-    choosePlan: "Choose plan",
-    billingInfo: "Billing information",
-    fullName: "Full name",
-    email: "Email",
-    country: "Country",
-    paymentMethod: "Payment method",
-    cardNumber: "Card number",
-    expiryDate: "Expiry date",
-    cvc: "CVC",
-    cardholderName: "Cardholder name",
-    orderSummary: "Order Summary",
+    subtitle: "Complete your subscription upgrade securely.",
+    badge: "Secure Checkout",
+    mainTitle: "Complete your StudyAI upgrade",
+    mainText:
+      "Review your plan, choose a payment method, and confirm your subscription. This is currently an interface preview.",
+    checkout: "Checkout",
+    checkoutHint:
+      "Payment provider integration will be connected later through backend/API.",
     selectedPlan: "Selected plan",
-    monthlyPrice: "Monthly price",
-    tax: "Tax",
+    billingCycle: "Billing cycle",
+    paymentMethod: "Payment method",
+    cardDetails: "Card details",
+    cardName: "Name on card",
+    cardNamePlaceholder: "e.g. Alex Student",
+    cardNumber: "Card number",
+    cardNumberPlaceholder: "1234 5678 9012 3456",
+    expiry: "Expiry date",
+    expiryPlaceholder: "MM/YY",
+    cvc: "CVC",
+    cvcPlaceholder: "123",
+    billingEmail: "Billing email",
+    billingEmailPlaceholder: "you@example.com",
+    country: "Country",
+    countryPlaceholder: "Select country",
+    summary: "Order summary",
+    subtotal: "Subtotal",
+    discount: "Discount",
+    taxes: "Taxes",
     total: "Total",
     payNow: "Pay now",
     processing: "Processing...",
-    successTitle: "Payment page ready.",
+    successTitle: "Payment preview completed",
     successText:
-      "Real payment gateway is not connected yet. This page is ready for backend/payment integration.",
-    required: "Please fill in all required fields.",
-    secureNote:
-      "Payment processing is not active yet. Do not enter real card details.",
-    studentPlan: "Student Plan",
-    teacherPlan: "Teacher Plan",
-    freePlan: "Free Plan",
-    month: "month",
+      "No real payment was made. Later this action will create a real subscription through the payment provider.",
+    backToSubscription: "Back to subscription",
+    secureNote: "Your payment will be processed securely.",
+    previewNotice: "Interface preview",
+    monthly: "Monthly",
+    yearly: "Yearly",
+    save: "Yearly plan saves 20%",
+    planLabels: {
+      pro: "Pro",
+      premium: "Premium",
+    },
+    methodLabels: {
+      card: "Card",
+      paypal: "PayPal",
+      bank: "Bank transfer",
+    },
+    planDescriptions: {
+      pro: "For active students who use StudyAI every week.",
+      premium: "For heavy academic work, thesis writing, and exam periods.",
+    },
+    countries: ["Czech Republic", "Germany", "Kazakhstan", "Poland", "Slovakia", "Other"],
+    features: [
+      "More AI credits",
+      "Advanced academic tools",
+      "Exam preparation support",
+      "Document generation",
+      "File-based study features",
+    ],
   },
 
   ru: {
     title: "Оплата",
-    subtitle: "Завершите обновление подписки.",
-    backToSubscription: "Назад к подписке",
-    paymentDetails: "Данные оплаты",
-    paymentSubtitle:
-      "Это frontend-страница оплаты для MVP. Реальная обработка платежей будет подключена позже.",
-    choosePlan: "Выберите план",
-    billingInfo: "Платёжная информация",
-    fullName: "Полное имя",
-    email: "Email",
-    country: "Страна",
-    paymentMethod: "Способ оплаты",
-    cardNumber: "Номер карты",
-    expiryDate: "Срок действия",
-    cvc: "CVC",
-    cardholderName: "Имя владельца карты",
-    orderSummary: "Итог заказа",
+    subtitle: "Безопасно заверши улучшение подписки.",
+    badge: "Безопасная оплата",
+    mainTitle: "Заверши улучшение StudyAI",
+    mainText:
+      "Проверь выбранный план, выбери способ оплаты и подтверди подписку. Сейчас это предпросмотр интерфейса.",
+    checkout: "Оплата",
+    checkoutHint:
+      "Интеграция платёжного провайдера будет подключена позже через backend/API.",
     selectedPlan: "Выбранный план",
-    monthlyPrice: "Цена в месяц",
-    tax: "Налог",
+    billingCycle: "Период оплаты",
+    paymentMethod: "Способ оплаты",
+    cardDetails: "Данные карты",
+    cardName: "Имя на карте",
+    cardNamePlaceholder: "например: Alex Student",
+    cardNumber: "Номер карты",
+    cardNumberPlaceholder: "1234 5678 9012 3456",
+    expiry: "Срок действия",
+    expiryPlaceholder: "ММ/ГГ",
+    cvc: "CVC",
+    cvcPlaceholder: "123",
+    billingEmail: "Email для оплаты",
+    billingEmailPlaceholder: "you@example.com",
+    country: "Страна",
+    countryPlaceholder: "Выбери страну",
+    summary: "Итог заказа",
+    subtotal: "Промежуточная сумма",
+    discount: "Скидка",
+    taxes: "Налоги",
     total: "Итого",
     payNow: "Оплатить",
     processing: "Обработка...",
-    successTitle: "Страница оплаты готова.",
+    successTitle: "Предпросмотр оплаты завершён",
     successText:
-      "Реальный платёжный шлюз пока не подключён. Страница готова для интеграции с backend/payment.",
-    required: "Пожалуйста, заполните все обязательные поля.",
-    secureNote:
-      "Обработка платежей пока не активна. Не вводите настоящие данные карты.",
-    studentPlan: "Студент",
-    teacherPlan: "Преподаватель",
-    freePlan: "Бесплатный",
-    month: "месяц",
+      "Реальная оплата не была выполнена. Позже это действие будет создавать настоящую подписку через платёжного провайдера.",
+    backToSubscription: "Вернуться к подписке",
+    secureNote: "Оплата будет обработана безопасно.",
+    previewNotice: "Предпросмотр интерфейса",
+    monthly: "Ежемесячно",
+    yearly: "Ежегодно",
+    save: "Годовой план экономит 20%",
+    planLabels: {
+      pro: "Pro",
+      premium: "Premium",
+    },
+    methodLabels: {
+      card: "Карта",
+      paypal: "PayPal",
+      bank: "Банковский перевод",
+    },
+    planDescriptions: {
+      pro: "Для активных студентов, которые используют StudyAI каждую неделю.",
+      premium: "Для интенсивной учёбы, диплома и периода экзаменов.",
+    },
+    countries: ["Чехия", "Германия", "Казахстан", "Польша", "Словакия", "Другое"],
+    features: [
+      "Больше AI-кредитов",
+      "Продвинутые учебные инструменты",
+      "Поддержка подготовки к экзаменам",
+      "Генерация документов",
+      "Учёба на основе файлов",
+    ],
   },
 
   kz: {
     title: "Төлем",
-    subtitle: "Жазылымды жаңартуды аяқтаңыз.",
-    backToSubscription: "Жазылымға қайту",
-    paymentDetails: "Төлем мәліметтері",
-    paymentSubtitle:
-      "Бұл MVP үшін frontend төлем беті. Нақты төлем өңдеу кейін қосылады.",
-    choosePlan: "Жоспар таңдаңыз",
-    billingInfo: "Төлем ақпараты",
-    fullName: "Толық аты",
-    email: "Email",
-    country: "Ел",
-    paymentMethod: "Төлем әдісі",
-    cardNumber: "Карта нөмірі",
-    expiryDate: "Жарамдылық мерзімі",
-    cvc: "CVC",
-    cardholderName: "Карта иесінің аты",
-    orderSummary: "Тапсырыс қорытындысы",
+    subtitle: "Жазылымды қауіпсіз түрде жақсарт.",
+    badge: "Қауіпсіз төлем",
+    mainTitle: "StudyAI жоспарын жақсартуды аяқта",
+    mainText:
+      "Таңдалған жоспарды тексер, төлем әдісін таңда және жазылымды раста. Қазір бұл интерфейс preview.",
+    checkout: "Төлем",
+    checkoutHint:
+      "Төлем провайдері кейін backend/API арқылы қосылады.",
     selectedPlan: "Таңдалған жоспар",
-    monthlyPrice: "Айлық баға",
-    tax: "Салық",
+    billingCycle: "Төлем кезеңі",
+    paymentMethod: "Төлем әдісі",
+    cardDetails: "Карта деректері",
+    cardName: "Картадағы аты",
+    cardNamePlaceholder: "мысалы: Alex Student",
+    cardNumber: "Карта нөмірі",
+    cardNumberPlaceholder: "1234 5678 9012 3456",
+    expiry: "Жарамдылық мерзімі",
+    expiryPlaceholder: "АА/ЖЖ",
+    cvc: "CVC",
+    cvcPlaceholder: "123",
+    billingEmail: "Төлем email",
+    billingEmailPlaceholder: "you@example.com",
+    country: "Ел",
+    countryPlaceholder: "Елді таңда",
+    summary: "Тапсырыс қорытындысы",
+    subtotal: "Аралық сома",
+    discount: "Жеңілдік",
+    taxes: "Салықтар",
     total: "Барлығы",
     payNow: "Төлеу",
     processing: "Өңделуде...",
-    successTitle: "Төлем беті дайын.",
+    successTitle: "Төлем preview аяқталды",
     successText:
-      "Нақты төлем жүйесі әлі қосылмаған. Бұл бет backend/payment интеграциясына дайын.",
-    required: "Барлық міндетті өрістерді толтырыңыз.",
-    secureNote:
-      "Төлем өңдеу әлі белсенді емес. Нақты карта деректерін енгізбеңіз.",
-    studentPlan: "Студент",
-    teacherPlan: "Мұғалім",
-    freePlan: "Тегін",
-    month: "ай",
+      "Нақты төлем жасалған жоқ. Кейін бұл әрекет төлем провайдері арқылы нақты жазылым жасайды.",
+    backToSubscription: "Жазылымға оралу",
+    secureNote: "Төлем қауіпсіз өңделеді.",
+    previewNotice: "Интерфейс preview",
+    monthly: "Ай сайын",
+    yearly: "Жыл сайын",
+    save: "Жылдық жоспар 20% үнемдейді",
+    planLabels: {
+      pro: "Pro",
+      premium: "Premium",
+    },
+    methodLabels: {
+      card: "Карта",
+      paypal: "PayPal",
+      bank: "Банк аударымы",
+    },
+    planDescriptions: {
+      pro: "StudyAI-ды апта сайын қолданатын белсенді студенттер үшін.",
+      premium: "Интенсивті оқу, диплом және емтихан кезеңдері үшін.",
+    },
+    countries: ["Чехия", "Германия", "Қазақстан", "Польша", "Словакия", "Басқа"],
+    features: [
+      "Көбірек AI кредиттері",
+      "Кеңейтілген оқу құралдары",
+      "Емтиханға дайындық қолдауы",
+      "Құжат генерациясы",
+      "Файлдар арқылы оқу",
+    ],
   },
 };
 
-const planData = {
-  free: {
-    id: "free",
-    price: 0,
+const planPrices = {
+  pro: {
+    monthly: 7.99,
+    yearly: 76.99,
   },
-  student: {
-    id: "student",
-    price: 9,
-  },
-  teacher: {
-    id: "teacher",
-    price: 19,
+  premium: {
+    monthly: 14.99,
+    yearly: 143.99,
   },
 };
 
-type PlanId = keyof typeof planData;
+function formatPrice(value: number) {
+  return `€${value.toFixed(2)}`;
+}
 
 export default function PaymentPage() {
-  const { language } = useLanguage();
-  const text = pageText[language];
-
-  const [selectedPlan, setSelectedPlan] = useState<PlanId>("student");
-  const [paymentMethod, setPaymentMethod] = useState("card");
-
-  const [fullName, setFullName] = useState("");
+  const [language, setLanguage] = useState<AppLanguage>("en");
+  const [plan, setPlan] = useState<PlanKey>("pro");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
+  const [cardName, setCardName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [cvc, setCvc] = useState("");
   const [email, setEmail] = useState("");
   const [country, setCountry] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [cvc, setCvc] = useState("");
-  const [cardholderName, setCardholderName] = useState("");
+  const [processing, setProcessing] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const t = useMemo(() => paymentText[language], [language]);
 
-  const planName = useMemo(() => {
-    if (selectedPlan === "free") return text.freePlan;
-    if (selectedPlan === "student") return text.studentPlan;
-    return text.teacherPlan;
-  }, [selectedPlan, text]);
+  const subtotal = planPrices[plan][billingCycle];
+  const discount = billingCycle === "yearly" ? subtotal * 0.2 : 0;
+  const taxes = 0;
+  const total = subtotal - discount + taxes;
 
-  const monthlyPrice = planData[selectedPlan].price;
-  const tax = Number((monthlyPrice * 0.21).toFixed(2));
-  const total = Number((monthlyPrice + tax).toFixed(2));
-
-  function handlePayment(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    setErrorMessage("");
-    setSuccessMessage("");
-
-    if (
-      !fullName.trim() ||
-      !email.trim() ||
-      !country.trim() ||
-      !cardNumber.trim() ||
-      !expiryDate.trim() ||
-      !cvc.trim() ||
-      !cardholderName.trim()
-    ) {
-      setErrorMessage(text.required);
-      return;
-    }
-
-    setLoading(true);
+  function handlePayment() {
+    setProcessing(true);
 
     setTimeout(() => {
-      setLoading(false);
-      setSuccessMessage(`${text.successTitle} ${text.successText}`);
-    }, 900);
+      setProcessing(false);
+      setSuccess(true);
+    }, 700);
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <AppSidebar />
+    <AppShell
+      language={language}
+      onLanguageChange={setLanguage}
+      title={t.title}
+      subtitle={t.subtitle}
+    >
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-blue-100/70 blur-3xl" />
+          <div className="absolute bottom-0 left-10 h-40 w-40 rounded-full bg-indigo-100/70 blur-3xl" />
 
-      <section className="min-h-screen px-4 pb-8 pt-20 sm:px-6 lg:ml-[300px] lg:px-10 lg:py-10">
-        <div className="mx-auto w-full max-w-[1680px]">
-          <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h1 className="text-3xl font-bold">{text.title}</h1>
-              <p className="mt-2 text-slate-500">{text.subtitle}</p>
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700">
+                🔒 {t.badge}
+              </div>
+
+              <h2 className="max-w-3xl text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                {t.mainTitle}
+              </h2>
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+                {t.mainText}
+              </p>
             </div>
+
+            <div className="rounded-[1.5rem] border border-blue-100 bg-blue-50 p-5">
+              <p className="text-sm font-bold text-blue-700">
+                {t.previewNotice}
+              </p>
+              <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
+                {t.checkoutHint}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {success ? (
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-3xl">
+              ✅
+            </div>
+            <h2 className="mt-5 text-2xl font-black text-slate-950">
+              {t.successTitle}
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-slate-500">
+              {t.successText}
+            </p>
 
             <Link
               href="/subscription"
-              className="w-fit rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="mt-6 inline-flex h-12 items-center justify-center rounded-full bg-blue-600 px-6 text-sm font-bold text-white shadow-sm shadow-blue-600/30 transition hover:bg-blue-700"
             >
-              {text.backToSubscription}
+              {t.backToSubscription}
             </Link>
-          </header>
-
-          <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_420px]">
-            <form
-              onSubmit={handlePayment}
-              className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
-            >
-              <div>
-                <h2 className="text-2xl font-bold">{text.paymentDetails}</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                  {text.paymentSubtitle}
-                </p>
-              </div>
-
-              <div className="mt-8">
-                <h3 className="mb-4 text-lg font-bold">{text.choosePlan}</h3>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPlan("free")}
-                    className={
-                      selectedPlan === "free"
-                        ? "rounded-2xl border-2 border-blue-600 bg-blue-50 p-5 text-left"
-                        : "rounded-2xl border border-slate-200 bg-white p-5 text-left hover:bg-slate-50"
-                    }
-                  >
-                    <p className="font-bold">{text.freePlan}</p>
-                    <p className="mt-2 text-sm text-slate-500">$0 / {text.month}</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPlan("student")}
-                    className={
-                      selectedPlan === "student"
-                        ? "rounded-2xl border-2 border-blue-600 bg-blue-50 p-5 text-left"
-                        : "rounded-2xl border border-slate-200 bg-white p-5 text-left hover:bg-slate-50"
-                    }
-                  >
-                    <p className="font-bold">{text.studentPlan}</p>
-                    <p className="mt-2 text-sm text-slate-500">$9 / {text.month}</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPlan("teacher")}
-                    className={
-                      selectedPlan === "teacher"
-                        ? "rounded-2xl border-2 border-blue-600 bg-blue-50 p-5 text-left"
-                        : "rounded-2xl border border-slate-200 bg-white p-5 text-left hover:bg-slate-50"
-                    }
-                  >
-                    <p className="font-bold">{text.teacherPlan}</p>
-                    <p className="mt-2 text-sm text-slate-500">$19 / {text.month}</p>
-                  </button>
+          </section>
+        ) : (
+          <section className="grid gap-6 xl:grid-cols-[1fr_420px]">
+            <div className="space-y-6">
+              <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <div className="mb-5">
+                  <h2 className="text-xl font-black text-slate-950">
+                    {t.checkout}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {t.checkoutHint}
+                  </p>
                 </div>
-              </div>
 
-              <div className="mt-10">
-                <h3 className="mb-4 text-lg font-bold">{text.billingInfo}</h3>
-
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div className="space-y-5">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      {text.fullName}
+                    <label className="mb-2 block text-sm font-bold text-slate-700">
+                      {t.selectedPlan}
                     </label>
-                    <input
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="John Smith"
-                    />
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {(["pro", "premium"] as PlanKey[]).map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => setPlan(item)}
+                          className={`rounded-3xl border p-4 text-left transition ${
+                            plan === item
+                              ? "border-blue-300 bg-blue-50 shadow-sm"
+                              : "border-slate-200 bg-slate-50 hover:border-blue-200 hover:bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-base font-black text-slate-950">
+                              {t.planLabels[item]}
+                            </h3>
+                            <span className="text-xl">
+                              {item === "pro" ? "⚡" : "🚀"}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-slate-500">
+                            {t.planDescriptions[item]}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      {text.email}
+                    <label className="mb-2 block text-sm font-bold text-slate-700">
+                      {t.billingCycle}
                     </label>
-                    <input
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="you@example.com"
-                    />
-                  </div>
 
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      {text.country}
-                    </label>
-                    <input
-                      value={country}
-                      onChange={(e) => setCountry(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Czech Republic"
-                    />
-                  </div>
-                </div>
-              </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setBillingCycle("monthly")}
+                        className={`h-12 rounded-full border text-sm font-bold transition ${
+                          billingCycle === "monthly"
+                            ? "border-blue-300 bg-blue-600 text-white shadow-sm shadow-blue-600/30"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:text-blue-700"
+                        }`}
+                      >
+                        {t.monthly}
+                      </button>
 
-              <div className="mt-10">
-                <h3 className="mb-4 text-lg font-bold">{text.paymentMethod}</h3>
-
-                <div className="mb-5 grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("card")}
-                    className={
-                      paymentMethod === "card"
-                        ? "rounded-2xl border-2 border-blue-600 bg-blue-50 px-5 py-4 text-sm font-bold text-blue-700"
-                        : "rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                    }
-                  >
-                    Card
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("paypal")}
-                    className={
-                      paymentMethod === "paypal"
-                        ? "rounded-2xl border-2 border-blue-600 bg-blue-50 px-5 py-4 text-sm font-bold text-blue-700"
-                        : "rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
-                    }
-                  >
-                    PayPal
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      {text.cardNumber}
-                    </label>
-                    <input
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="4242 4242 4242 4242"
-                    />
+                      <button
+                        type="button"
+                        onClick={() => setBillingCycle("yearly")}
+                        className={`h-12 rounded-full border text-sm font-bold transition ${
+                          billingCycle === "yearly"
+                            ? "border-blue-300 bg-blue-600 text-white shadow-sm shadow-blue-600/30"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:text-blue-700"
+                        }`}
+                      >
+                        {t.yearly} · {t.save}
+                      </button>
+                    </div>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      {text.expiryDate}
+                    <label className="mb-2 block text-sm font-bold text-slate-700">
+                      {t.paymentMethod}
                     </label>
-                    <input
-                      value={expiryDate}
-                      onChange={(e) => setExpiryDate(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="12/28"
-                    />
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {(["card", "paypal", "bank"] as PaymentMethod[]).map(
+                        (method) => (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => setPaymentMethod(method)}
+                            className={`h-12 rounded-full border text-sm font-bold transition ${
+                              paymentMethod === method
+                                ? "border-blue-300 bg-blue-50 text-blue-700"
+                                : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:text-blue-700"
+                            }`}
+                          >
+                            {method === "card" ? "💳 " : method === "paypal" ? "🅿️ " : "🏦 "}
+                            {t.methodLabels[method]}
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      {text.cvc}
-                    </label>
-                    <input
-                      value={cvc}
-                      onChange={(e) => setCvc(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="123"
-                    />
-                  </div>
+                  {paymentMethod === "card" && (
+                    <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
+                      <h3 className="text-lg font-black text-slate-950">
+                        {t.cardDetails}
+                      </h3>
 
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      {text.cardholderName}
-                    </label>
-                    <input
-                      value={cardholderName}
-                      onChange={(e) => setCardholderName(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="John Smith"
-                    />
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <label className="mb-2 block text-sm font-bold text-slate-700">
+                            {t.cardName}
+                          </label>
+                          <input
+                            value={cardName}
+                            onChange={(event) => setCardName(event.target.value)}
+                            placeholder={t.cardNamePlaceholder}
+                            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-bold text-slate-700">
+                            {t.cardNumber}
+                          </label>
+                          <input
+                            value={cardNumber}
+                            onChange={(event) =>
+                              setCardNumber(event.target.value)
+                            }
+                            placeholder={t.cardNumberPlaceholder}
+                            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                          />
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label className="mb-2 block text-sm font-bold text-slate-700">
+                              {t.expiry}
+                            </label>
+                            <input
+                              value={expiry}
+                              onChange={(event) => setExpiry(event.target.value)}
+                              placeholder={t.expiryPlaceholder}
+                              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-sm font-bold text-slate-700">
+                              {t.cvc}
+                            </label>
+                            <input
+                              value={cvc}
+                              onChange={(event) => setCvc(event.target.value)}
+                              placeholder={t.cvcPlaceholder}
+                              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        {t.billingEmail}
+                      </label>
+                      <input
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        placeholder={t.billingEmailPlaceholder}
+                        className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-slate-700">
+                        {t.country}
+                      </label>
+                      <select
+                        value={country}
+                        onChange={(event) => setCountry(event.target.value)}
+                        className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                      >
+                        <option value="">{t.countryPlaceholder}</option>
+                        {t.countries.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {errorMessage && (
-                <div className="mt-6 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                  {errorMessage}
-                </div>
-              )}
+            <aside className="space-y-6">
+              <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <h2 className="text-xl font-black text-slate-950">
+                  {t.summary}
+                </h2>
 
-              {successMessage && (
-                <div className="mt-6 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-medium text-green-600">
-                  {successMessage}
-                </div>
-              )}
+                <div className="mt-5 rounded-3xl bg-blue-50 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-bold text-blue-700">
+                        {t.planLabels[plan]}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        {t.planDescriptions[plan]}
+                      </p>
+                    </div>
 
-              <div className="mt-8 rounded-2xl border border-yellow-100 bg-yellow-50 p-5 text-sm leading-6 text-yellow-700">
-                {text.secureNote}
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="mt-8 w-full rounded-xl bg-blue-600 px-6 py-4 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
-              >
-                {loading ? text.processing : text.payNow}
-              </button>
-            </form>
-
-            <aside className="h-fit rounded-3xl border border-slate-200 bg-white p-6 shadow-sm xl:sticky xl:top-10">
-              <h2 className="text-xl font-bold">{text.orderSummary}</h2>
-
-              <div className="mt-6 rounded-2xl bg-blue-50 p-5">
-                <p className="text-sm font-semibold text-blue-600">
-                  {text.selectedPlan}
-                </p>
-                <p className="mt-1 text-2xl font-bold text-blue-700">
-                  {planName}
-                </p>
-              </div>
-
-              <div className="mt-6 space-y-4 text-sm">
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500">{text.monthlyPrice}</span>
-                  <span className="font-bold">${monthlyPrice.toFixed(2)}</span>
-                </div>
-
-                <div className="flex justify-between gap-4">
-                  <span className="text-slate-500">{text.tax}</span>
-                  <span className="font-bold">${tax.toFixed(2)}</span>
-                </div>
-
-                <div className="border-t border-slate-200 pt-4">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-lg font-bold">{text.total}</span>
-                    <span className="text-lg font-bold">
-                      ${total.toFixed(2)}
+                    <span className="text-2xl">
+                      {plan === "pro" ? "⚡" : "🚀"}
                     </span>
                   </div>
                 </div>
+
+                <div className="mt-5 space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">{t.subtotal}</span>
+                    <span className="font-bold text-slate-950">
+                      {formatPrice(subtotal)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">{t.discount}</span>
+                    <span className="font-bold text-emerald-600">
+                      -{formatPrice(discount)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">{t.taxes}</span>
+                    <span className="font-bold text-slate-950">
+                      {formatPrice(taxes)}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-slate-200 pt-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-base font-black text-slate-950">
+                        {t.total}
+                      </span>
+                      <span className="text-3xl font-black text-slate-950">
+                        {formatPrice(total)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePayment}
+                  disabled={processing}
+                  className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shadow-sm shadow-blue-600/30 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {processing ? t.processing : t.payNow}
+                </button>
+
+                <p className="mt-4 text-center text-xs leading-5 text-slate-400">
+                  🔒 {t.secureNote}
+                </p>
               </div>
 
-              <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-sm leading-6 text-slate-500">
-                {text.paymentSubtitle}
+              <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="text-lg font-black text-slate-950">
+                  {t.selectedPlan}
+                </h2>
+
+                <div className="mt-4 space-y-3">
+                  {t.features.map((feature) => (
+                    <div key={feature} className="flex gap-3">
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xs font-black text-emerald-700">
+                        ✓
+                      </span>
+                      <p className="text-sm leading-6 text-slate-600">
+                        {feature}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </aside>
-          </div>
-        </div>
-      </section>
-    </main>
+          </section>
+        )}
+      </div>
+    </AppShell>
   );
 }

@@ -1,624 +1,866 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import AppSidebar from "@/components/AppSidebar";
-import { useLanguage } from "@/components/LanguageProvider";
+import { useEffect, useMemo, useState } from "react";
+import AppShell from "@/components/AppShell";
 
-const pageText = {
+type Language = "en" | "ru" | "kz";
+type Theme = "light" | "dark";
+type DocumentStatus = "draft" | "generated" | "reviewed" | "archived";
+type DocumentType = "essay" | "summary" | "research" | "report";
+type FilterKey = "all" | DocumentStatus;
+
+type DocumentItem = {
+  id: number;
+  titleKey: "aiEthics" | "marketSummary" | "researchPlan" | "internshipReport";
+  courseKey: "academicWriting" | "economics" | "researchMethods" | "career";
+  type: DocumentType;
+  status: DocumentStatus;
+  updatedAt: Date;
+  words: number;
+  progress: number;
+};
+
+type DocumentsCopy = {
+  pageBadge: string;
+  pageTitle: string;
+  pageSubtitle: string;
+  createDocument: string;
+  searchPlaceholder: string;
+  filters: Record<FilterKey, string>;
+  stats: {
+    total: string;
+    drafts: string;
+    generated: string;
+    reviewed: string;
+  };
+  sectionTitle: string;
+  sectionSubtitle: string;
+  open: string;
+  continue: string;
+  updated: string;
+  words: string;
+  progress: string;
+  emptyTitle: string;
+  emptySubtitle: string;
+  resetFilters: string;
+  assistantTitle: string;
+  assistantSubtitle: string;
+  createEssay: string;
+  summarizeText: string;
+  improveDraft: string;
+  recentTitle: string;
+  recentSubtitle: string;
+  typesTitle: string;
+  titles: Record<DocumentItem["titleKey"], string>;
+  courses: Record<DocumentItem["courseKey"], string>;
+  statuses: Record<DocumentStatus, string>;
+  types: Record<DocumentType, string>;
+};
+
+const copy: Record<Language, DocumentsCopy> = {
   en: {
-    title: "Documents",
-    subtitle: "Generate academic documents, summaries, outlines, and study materials.",
-    formTitle: "Document Generator",
-    formSubtitle:
-      "Choose the document type, language, and style, then generate a ready-to-edit text.",
-    documentTitle: "Document title",
-    documentTitlePlaceholder: "Example: The Impact of AI on Education",
-    documentType: "Document type",
-    documentLanguage: "Language",
-    documentStyle: "Style",
-    topic: "Topic / prompt",
-    topicPlaceholder: "Describe what the document should be about...",
-    requirements: "Requirements",
-    requirementsPlaceholder:
-      "Add length, structure, citations, teacher instructions, or specific points...",
-    keywords: "Keywords",
-    keywordsPlaceholder: "Example: AI, education, personalization, ethics",
-    generateText: "Generate text",
-    saveDocument: "Save document",
-    clear: "Clear",
-    generatedDocument: "Generated Document",
-    savedDocuments: "Saved Documents",
-    noSavedDocuments: "No saved documents yet.",
-    required: "Please fill in the title, topic, document type, language, and style.",
-    generatedReady: "Document text generated successfully.",
-    savedReady: "Document saved locally.",
-    nothingToSave: "Generate a document first.",
-    backToDashboard: "Back to Dashboard",
-    frontendNoteTitle: "Frontend status",
-    frontendNote:
-      "This page includes the frontend UI for document generation, document type selection, language and style selection, text generation preview, and local saving. Real AI generation and profile saving can be connected later through backend/API.",
-    savedLocally: "Saved locally",
-    documentTypes: [
-      "Essay",
-      "Report",
-      "Summary",
-      "Research outline",
-      "Presentation text",
-      "Formal email",
-      "Study notes",
-    ],
-    languages: ["English", "Russian", "Kazakh"],
-    styles: [
-      "Academic",
-      "Simple",
-      "Professional",
-      "Formal",
-      "Short and clear",
-      "Detailed",
-    ],
-    previewCards: [
-      {
-        title: "Document type",
-        text: "Select what kind of text should be generated.",
-      },
-      {
-        title: "Language and style",
-        text: "Choose the output language and writing style.",
-      },
-      {
-        title: "Save document",
-        text: "Save generated drafts locally for later use.",
-      },
-    ],
-    generatedIntro: "This document introduces the selected topic and explains its academic relevance.",
-    generatedBody:
-      "The main section develops the key ideas, connects them with the provided requirements, and organizes the content in a logical structure.",
-    generatedConclusion:
-      "In conclusion, the document summarizes the main points and provides a clear final statement based on the selected topic.",
+    pageBadge: "Documents workspace",
+    pageTitle: "Documents",
+    pageSubtitle:
+      "Generate, organize, and improve academic documents with AI support.",
+    createDocument: "Create document",
+    searchPlaceholder: "Search documents...",
+    filters: {
+      all: "All",
+      draft: "Drafts",
+      generated: "Generated",
+      reviewed: "Reviewed",
+      archived: "Archived",
+    },
+    stats: {
+      total: "Total documents",
+      drafts: "Drafts",
+      generated: "Generated",
+      reviewed: "Reviewed",
+    },
+    sectionTitle: "Your documents",
+    sectionSubtitle: "Manage essays, summaries, research papers, and reports.",
+    open: "Open",
+    continue: "Continue",
+    updated: "Updated",
+    words: "words",
+    progress: "Progress",
+    emptyTitle: "No documents found",
+    emptySubtitle:
+      "Try another search or reset filters to see all documents.",
+    resetFilters: "Reset filters",
+    assistantTitle: "AI document assistant",
+    assistantSubtitle:
+      "Create outlines, improve structure, summarize files, and polish your academic writing.",
+    createEssay: "Create essay",
+    summarizeText: "Summarize text",
+    improveDraft: "Improve draft",
+    recentTitle: "Recent document",
+    recentSubtitle: "Last updated document in your workspace.",
+    typesTitle: "Document type",
+    titles: {
+      aiEthics: "AI Ethics Essay Draft",
+      marketSummary: "Market Analysis Summary",
+      researchPlan: "Research Project Plan",
+      internshipReport: "Internship Report",
+    },
+    courses: {
+      academicWriting: "Academic Writing",
+      economics: "Economics",
+      researchMethods: "Research Methods",
+      career: "Career Development",
+    },
+    statuses: {
+      draft: "Draft",
+      generated: "Generated",
+      reviewed: "Reviewed",
+      archived: "Archived",
+    },
+    types: {
+      essay: "Essay",
+      summary: "Summary",
+      research: "Research paper",
+      report: "Report",
+    },
   },
-
   ru: {
-    title: "Документы",
-    subtitle: "Генерируйте академические документы, summary, планы и учебные материалы.",
-    formTitle: "Document Generator",
-    formSubtitle:
-      "Выберите тип документа, язык и стиль, затем сгенерируйте текст, который можно редактировать.",
-    documentTitle: "Название документа",
-    documentTitlePlaceholder: "Например: Влияние AI на образование",
-    documentType: "Тип документа",
-    documentLanguage: "Язык",
-    documentStyle: "Стиль",
-    topic: "Тема / prompt",
-    topicPlaceholder: "Опишите, о чём должен быть документ...",
-    requirements: "Требования",
-    requirementsPlaceholder:
-      "Добавьте объём, структуру, цитирование, инструкции преподавателя или важные пункты...",
-    keywords: "Ключевые слова",
-    keywordsPlaceholder: "Например: AI, образование, персонализация, этика",
-    generateText: "Сгенерировать текст",
-    saveDocument: "Сохранить документ",
-    clear: "Очистить",
-    generatedDocument: "Сгенерированный документ",
-    savedDocuments: "Сохранённые документы",
-    noSavedDocuments: "Пока нет сохранённых документов.",
-    required: "Пожалуйста, заполните название, тему, тип документа, язык и стиль.",
-    generatedReady: "Текст документа успешно сгенерирован.",
-    savedReady: "Документ сохранён локально.",
-    nothingToSave: "Сначала сгенерируйте документ.",
-    backToDashboard: "Назад в панель",
-    frontendNoteTitle: "Frontend статус",
-    frontendNote:
-      "Эта страница содержит frontend UI для генерации документов, выбора типа документа, выбора языка и стиля, предварительной генерации текста и локального сохранения. Реальную AI-генерацию и сохранение в профиле можно подключить позже через backend/API.",
-    savedLocally: "Сохранено локально",
-    documentTypes: [
-      "Эссе",
-      "Отчёт",
-      "Summary",
-      "План исследования",
-      "Текст презентации",
-      "Формальное письмо",
-      "Учебные заметки",
-    ],
-    languages: ["Английский", "Русский", "Казахский"],
-    styles: [
-      "Академический",
-      "Простой",
-      "Профессиональный",
-      "Формальный",
-      "Коротко и понятно",
-      "Подробный",
-    ],
-    previewCards: [
-      {
-        title: "Тип документа",
-        text: "Выберите, какой именно текст нужно сгенерировать.",
-      },
-      {
-        title: "Язык и стиль",
-        text: "Выберите язык результата и стиль написания.",
-      },
-      {
-        title: "Сохранение документа",
-        text: "Сохраняйте сгенерированные черновики локально.",
-      },
-    ],
-    generatedIntro:
-      "Этот документ вводит выбранную тему и объясняет её академическую значимость.",
-    generatedBody:
-      "Основная часть раскрывает ключевые идеи, связывает их с указанными требованиями и выстраивает материал в логичную структуру.",
-    generatedConclusion:
-      "В заключение документ подводит итоги, выделяет основные мысли и формирует финальный вывод по выбранной теме.",
+    pageBadge: "Documents workspace",
+    pageTitle: "Документы",
+    pageSubtitle:
+      "Создавай, организуй и улучшай учебные документы с помощью AI.",
+    createDocument: "Создать документ",
+    searchPlaceholder: "Поиск документов...",
+    filters: {
+      all: "Все",
+      draft: "Черновики",
+      generated: "Сгенерировано",
+      reviewed: "Проверено",
+      archived: "Архив",
+    },
+    stats: {
+      total: "Всего документов",
+      drafts: "Черновики",
+      generated: "Сгенерировано",
+      reviewed: "Проверено",
+    },
+    sectionTitle: "Твои документы",
+    sectionSubtitle: "Управляй эссе, конспектами, исследованиями и отчётами.",
+    open: "Открыть",
+    continue: "Продолжить",
+    updated: "Обновлено",
+    words: "слов",
+    progress: "Прогресс",
+    emptyTitle: "Документы не найдены",
+    emptySubtitle:
+      "Попробуй изменить поиск или сбросить фильтры, чтобы увидеть все документы.",
+    resetFilters: "Сбросить фильтры",
+    assistantTitle: "AI-помощник для документов",
+    assistantSubtitle:
+      "Создавай планы, улучшай структуру, сокращай тексты и дорабатывай академический стиль.",
+    createEssay: "Создать эссе",
+    summarizeText: "Сделать конспект",
+    improveDraft: "Улучшить черновик",
+    recentTitle: "Недавний документ",
+    recentSubtitle: "Последний обновлённый документ в workspace.",
+    typesTitle: "Тип документа",
+    titles: {
+      aiEthics: "Черновик эссе об этике AI",
+      marketSummary: "Конспект анализа рынка",
+      researchPlan: "План исследовательского проекта",
+      internshipReport: "Отчёт по стажировке",
+    },
+    courses: {
+      academicWriting: "Academic Writing",
+      economics: "Economics",
+      researchMethods: "Research Methods",
+      career: "Career Development",
+    },
+    statuses: {
+      draft: "Черновик",
+      generated: "Сгенерировано",
+      reviewed: "Проверено",
+      archived: "Архив",
+    },
+    types: {
+      essay: "Эссе",
+      summary: "Конспект",
+      research: "Исследовательская работа",
+      report: "Отчёт",
+    },
   },
-
   kz: {
-    title: "Құжаттар",
-    subtitle: "Академиялық құжаттар, summary, жоспарлар және оқу материалдарын жасаңыз.",
-    formTitle: "Document Generator",
-    formSubtitle:
-      "Құжат түрін, тілін және стилін таңдап, өңдеуге дайын мәтін жасаңыз.",
-    documentTitle: "Құжат атауы",
-    documentTitlePlaceholder: "Мысалы: AI-дың білімге әсері",
-    documentType: "Құжат түрі",
-    documentLanguage: "Тіл",
-    documentStyle: "Стиль",
-    topic: "Тақырып / prompt",
-    topicPlaceholder: "Құжат не туралы болуы керек екенін сипаттаңыз...",
-    requirements: "Талаптар",
-    requirementsPlaceholder:
-      "Көлем, құрылым, citation, мұғалім нұсқаулары немесе маңызды пункттерді қосыңыз...",
-    keywords: "Кілт сөздер",
-    keywordsPlaceholder: "Мысалы: AI, білім, персонализация, этика",
-    generateText: "Мәтін жасау",
-    saveDocument: "Құжатты сақтау",
-    clear: "Тазалау",
-    generatedDocument: "Жасалған құжат",
-    savedDocuments: "Сақталған құжаттар",
-    noSavedDocuments: "Әзірге сақталған құжат жоқ.",
-    required: "Құжат атауын, тақырыпты, құжат түрін, тілді және стильді толтырыңыз.",
-    generatedReady: "Құжат мәтіні сәтті жасалды.",
-    savedReady: "Құжат локалды сақталды.",
-    nothingToSave: "Алдымен құжат жасаңыз.",
-    backToDashboard: "Панельге қайту",
-    frontendNoteTitle: "Frontend статусы",
-    frontendNote:
-      "Бұл бетте құжат жасау, құжат түрін таңдау, тіл және стиль таңдау, мәтін preview жасау және локалды сақтау үшін frontend UI бар. Нақты AI генерация және профильге сақтау кейін backend/API арқылы қосылады.",
-    savedLocally: "Локалды сақталды",
-    documentTypes: [
-      "Эссе",
-      "Есеп",
-      "Summary",
-      "Зерттеу жоспары",
-      "Презентация мәтіні",
-      "Ресми хат",
-      "Оқу жазбалары",
-    ],
-    languages: ["Ағылшын", "Орыс", "Қазақ"],
-    styles: [
-      "Академиялық",
-      "Қарапайым",
-      "Кәсіби",
-      "Ресми",
-      "Қысқа әрі түсінікті",
-      "Толық",
-    ],
-    previewCards: [
-      {
-        title: "Құжат түрі",
-        text: "Қандай мәтін жасалу керек екенін таңдаңыз.",
-      },
-      {
-        title: "Тіл және стиль",
-        text: "Нәтиже тілін және жазу стилін таңдаңыз.",
-      },
-      {
-        title: "Құжатты сақтау",
-        text: "Жасалған draft мәтіндерді локалды сақтаңыз.",
-      },
-    ],
-    generatedIntro:
-      "Бұл құжат таңдалған тақырыпты таныстырып, оның академиялық маңызын түсіндіреді.",
-    generatedBody:
-      "Негізгі бөлім басты идеяларды ашып, оларды берілген талаптармен байланыстырады және мәтінді логикалық құрылымға келтіреді.",
-    generatedConclusion:
-      "Қорытынды бөлім негізгі ойларды жинақтап, таңдалған тақырып бойынша нақты финалдық тұжырым береді.",
+    pageBadge: "Documents workspace",
+    pageTitle: "Құжаттар",
+    pageSubtitle:
+      "AI көмегімен оқу құжаттарын жасаңыз, реттеңіз және жақсартыңыз.",
+    createDocument: "Құжат жасау",
+    searchPlaceholder: "Құжаттарды іздеу...",
+    filters: {
+      all: "Барлығы",
+      draft: "Черновиктер",
+      generated: "Жасалды",
+      reviewed: "Тексерілді",
+      archived: "Архив",
+    },
+    stats: {
+      total: "Барлық құжат",
+      drafts: "Черновиктер",
+      generated: "Жасалды",
+      reviewed: "Тексерілді",
+    },
+    sectionTitle: "Сіздің құжаттарыңыз",
+    sectionSubtitle:
+      "Эссе, конспект, зерттеу жұмыстары және есептерді басқарыңыз.",
+    open: "Ашу",
+    continue: "Жалғастыру",
+    updated: "Жаңартылды",
+    words: "сөз",
+    progress: "Прогресс",
+    emptyTitle: "Құжаттар табылмады",
+    emptySubtitle:
+      "Басқа іздеу қолданып көріңіз немесе барлық құжатты көру үшін фильтрді тазалаңыз.",
+    resetFilters: "Фильтрді тазалау",
+    assistantTitle: "AI құжат көмекшісі",
+    assistantSubtitle:
+      "Жоспар құрыңыз, құрылымды жақсартыңыз, мәтінді қысқартыңыз және академиялық стильді түзетіңіз.",
+    createEssay: "Эссе жасау",
+    summarizeText: "Конспект жасау",
+    improveDraft: "Черновикті жақсарту",
+    recentTitle: "Соңғы құжат",
+    recentSubtitle: "Workspace ішіндегі соңғы жаңартылған құжат.",
+    typesTitle: "Құжат түрі",
+    titles: {
+      aiEthics: "AI этикасы туралы эссе черновигі",
+      marketSummary: "Нарық талдауы конспекті",
+      researchPlan: "Зерттеу жобасының жоспары",
+      internshipReport: "Практика есебі",
+    },
+    courses: {
+      academicWriting: "Academic Writing",
+      economics: "Economics",
+      researchMethods: "Research Methods",
+      career: "Career Development",
+    },
+    statuses: {
+      draft: "Черновик",
+      generated: "Жасалды",
+      reviewed: "Тексерілді",
+      archived: "Архив",
+    },
+    types: {
+      essay: "Эссе",
+      summary: "Конспект",
+      research: "Зерттеу жұмысы",
+      report: "Есеп",
+    },
   },
 };
 
-type SavedDocument = {
-  id: string;
-  title: string;
-  type: string;
-  language: string;
-  style: string;
-  content: string;
-  createdAt: string;
-};
+const languageStorageKeys = [
+  "studyai-language",
+  "studyai_lang",
+  "language",
+  "locale",
+];
 
-export default function DocumentsPage() {
-  const { language } = useLanguage();
-  const text = pageText[language];
+const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 
-  const [documentTitle, setDocumentTitle] = useState("");
-  const [documentTypeIndex, setDocumentTypeIndex] = useState(0);
-  const [documentLanguageIndex, setDocumentLanguageIndex] = useState(0);
-  const [documentStyleIndex, setDocumentStyleIndex] = useState(0);
-  const [topic, setTopic] = useState("");
-  const [requirements, setRequirements] = useState("");
-  const [keywords, setKeywords] = useState("");
+const documents: DocumentItem[] = [
+  {
+    id: 1,
+    titleKey: "aiEthics",
+    courseKey: "academicWriting",
+    type: "essay",
+    status: "draft",
+    updatedAt: new Date("2026-05-23T12:00:00"),
+    words: 1240,
+    progress: 58,
+  },
+  {
+    id: 2,
+    titleKey: "marketSummary",
+    courseKey: "economics",
+    type: "summary",
+    status: "generated",
+    updatedAt: new Date("2026-05-22T12:00:00"),
+    words: 860,
+    progress: 100,
+  },
+  {
+    id: 3,
+    titleKey: "researchPlan",
+    courseKey: "researchMethods",
+    type: "research",
+    status: "reviewed",
+    updatedAt: new Date("2026-05-20T12:00:00"),
+    words: 2100,
+    progress: 92,
+  },
+  {
+    id: 4,
+    titleKey: "internshipReport",
+    courseKey: "career",
+    type: "report",
+    status: "archived",
+    updatedAt: new Date("2026-05-14T12:00:00"),
+    words: 1750,
+    progress: 100,
+  },
+];
 
-  const [generatedText, setGeneratedText] = useState("");
-  const [savedDocuments, setSavedDocuments] = useState<SavedDocument[]>([]);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+function getStoredLanguage(): Language {
+  if (typeof window === "undefined") return "ru";
 
-  const documentType = text.documentTypes[documentTypeIndex] || text.documentTypes[0];
-  const documentLanguage =
-    text.languages[documentLanguageIndex] || text.languages[0];
-  const documentStyle = text.styles[documentStyleIndex] || text.styles[0];
+  for (const key of languageStorageKeys) {
+    const value = window.localStorage.getItem(key);
 
-  useMemo(() => {
-    const saved = localStorage.getItem("studyai_saved_documents");
+    if (value === "en" || value === "ru" || value === "kz") {
+      return value;
+    }
+  }
 
-    if (saved) {
-      try {
-        setSavedDocuments(JSON.parse(saved));
-      } catch {
-        setSavedDocuments([]);
+  return "ru";
+}
+
+function getStoredTheme(): Theme {
+  if (typeof window === "undefined") return "dark";
+
+  for (const key of themeStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "light" || value === "dark") {
+      return value;
+    }
+  }
+
+  return "dark";
+}
+
+function formatDate(date: Date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+
+  return `${day}.${month}.${year}`;
+}
+
+function formatWords(words: number) {
+  return new Intl.NumberFormat("ru-RU").format(words);
+}
+
+function getStatusColor(status: DocumentStatus, isDark: boolean) {
+  if (status === "reviewed") {
+    return isDark
+      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+      : "border-emerald-100 bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "generated") {
+    return isDark
+      ? "border-blue-400/20 bg-blue-400/10 text-blue-200"
+      : "border-blue-100 bg-blue-50 text-blue-700";
+  }
+
+  if (status === "archived") {
+    return isDark
+      ? "border-slate-400/20 bg-slate-400/10 text-slate-300"
+      : "border-slate-200 bg-slate-100 text-slate-600";
+  }
+
+  return isDark
+    ? "border-violet-400/20 bg-violet-400/10 text-violet-200"
+    : "border-violet-100 bg-violet-50 text-violet-700";
+}
+
+function DocumentsContent() {
+  const [language, setLanguage] = useState<Language>("ru");
+  const [theme, setTheme] = useState<Theme>("dark");
+  const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
+  const [search, setSearch] = useState("");
+
+  const t = copy[language];
+  const isDark = theme === "dark";
+
+  useEffect(() => {
+    setLanguage(getStoredLanguage());
+    setTheme(getStoredTheme());
+
+    function handleLanguageChange(event: Event) {
+      const customEvent = event as CustomEvent<Language>;
+
+      if (
+        customEvent.detail === "en" ||
+        customEvent.detail === "ru" ||
+        customEvent.detail === "kz"
+      ) {
+        setLanguage(customEvent.detail);
       }
     }
+
+    function handleThemeChange(event: Event) {
+      const customEvent = event as CustomEvent<Theme>;
+
+      if (customEvent.detail === "light" || customEvent.detail === "dark") {
+        setTheme(customEvent.detail);
+      }
+    }
+
+    function handleStorageChange() {
+      setLanguage(getStoredLanguage());
+      setTheme(getStoredTheme());
+    }
+
+    window.addEventListener("studyai:language-change", handleLanguageChange);
+    window.addEventListener("studyai:theme-change", handleThemeChange);
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener(
+        "studyai:language-change",
+        handleLanguageChange
+      );
+      window.removeEventListener("studyai:theme-change", handleThemeChange);
+      window.removeEventListener("storage", handleStorageChange);
+    };
   }, []);
 
-  function handleGenerateText(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    setErrorMessage("");
-    setSuccessMessage("");
-
-    if (
-      !documentTitle.trim() ||
-      !topic.trim() ||
-      !documentType.trim() ||
-      !documentLanguage.trim() ||
-      !documentStyle.trim()
-    ) {
-      setErrorMessage(text.required);
-      setGeneratedText("");
-      return;
-    }
-
-    const requirementsBlock = requirements.trim()
-      ? `\n\nRequirements:\n${requirements.trim()}`
-      : "";
-
-    const keywordsBlock = keywords.trim()
-      ? `\n\nKeywords:\n${keywords.trim()}`
-      : "";
-
-    const result = `${documentTitle}
-
-Document type: ${documentType}
-Language: ${documentLanguage}
-Style: ${documentStyle}
-
-1. Introduction
-${text.generatedIntro}
-
-2. Main Content
-${text.generatedBody}
-
-Topic:
-${topic.trim()}
-
-3. Conclusion
-${text.generatedConclusion}${requirementsBlock}${keywordsBlock}`;
-
-    setGeneratedText(result);
-    setSuccessMessage(text.generatedReady);
-  }
-
-  function handleSaveDocument() {
-    setErrorMessage("");
-    setSuccessMessage("");
-
-    if (!generatedText.trim()) {
-      setErrorMessage(text.nothingToSave);
-      return;
-    }
-
-    const newDocument: SavedDocument = {
-      id: crypto.randomUUID(),
-      title: documentTitle.trim(),
-      type: documentType,
-      language: documentLanguage,
-      style: documentStyle,
-      content: generatedText,
-      createdAt: new Date().toLocaleString(),
+  const stats = useMemo(() => {
+    return {
+      total: documents.length,
+      drafts: documents.filter((item) => item.status === "draft").length,
+      generated: documents.filter((item) => item.status === "generated").length,
+      reviewed: documents.filter((item) => item.status === "reviewed").length,
     };
+  }, []);
 
-    const updatedDocuments = [newDocument, ...savedDocuments].slice(0, 5);
+  const filteredDocuments = useMemo(() => {
+    const query = search.trim().toLowerCase();
 
-    setSavedDocuments(updatedDocuments);
-    localStorage.setItem(
-      "studyai_saved_documents",
-      JSON.stringify(updatedDocuments)
-    );
+    return documents.filter((document) => {
+      const matchesStatus =
+        activeFilter === "all" || document.status === activeFilter;
 
-    setSuccessMessage(text.savedReady);
-  }
+      const searchableText = [
+        t.titles[document.titleKey],
+        t.courses[document.courseKey],
+        t.statuses[document.status],
+        t.types[document.type],
+      ]
+        .join(" ")
+        .toLowerCase();
 
-  function handleClear() {
-    setDocumentTitle("");
-    setDocumentTypeIndex(0);
-    setDocumentLanguageIndex(0);
-    setDocumentStyleIndex(0);
-    setTopic("");
-    setRequirements("");
-    setKeywords("");
-    setGeneratedText("");
-    setErrorMessage("");
-    setSuccessMessage("");
-  }
+      const matchesSearch = !query || searchableText.includes(query);
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [activeFilter, search, t]);
+
+  const recentDocument = useMemo(() => {
+    return [...documents].sort(
+      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
+    )[0];
+  }, []);
+
+  const pageClass = isDark
+    ? "min-h-full bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8"
+    : "min-h-full bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8";
+
+  const cardClass = isDark
+    ? "border-white/10 bg-slate-900/70 shadow-sm"
+    : "border-slate-200 bg-white shadow-sm";
+
+  const softCardClass = isDark
+    ? "border-white/10 bg-slate-950/50"
+    : "border-slate-200 bg-slate-50";
+
+  const titleClass = isDark ? "text-white" : "text-slate-950";
+  const textClass = isDark ? "text-slate-300" : "text-slate-600";
+  const mutedClass = isDark ? "text-slate-400" : "text-slate-500";
+
+  const inputClass = isDark
+    ? "border-white/10 bg-slate-950/70 text-white placeholder:text-slate-500 focus:border-blue-400 focus:ring-blue-500/10"
+    : "border-slate-200 bg-white text-slate-950 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/10";
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <AppSidebar />
+    <div className={pageClass}>
+      <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section
+          className={`min-w-0 overflow-hidden rounded-[2rem] border p-5 sm:p-6 lg:p-8 xl:col-span-2 ${cardClass}`}
+        >
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+            <div className="min-w-0">
+              <div
+                className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold ${
+                  isDark
+                    ? "border-blue-400/20 bg-blue-400/10 text-blue-200"
+                    : "border-blue-100 bg-blue-50 text-blue-700"
+                }`}
+              >
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                {t.pageBadge}
+              </div>
 
-      <section className="min-h-screen px-4 pb-8 pt-20 sm:px-6 lg:ml-[300px] lg:px-10 lg:py-10">
-        <div className="mx-auto w-full max-w-[1680px]">
-          <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">{text.title}</h1>
-              <p className="mt-2 text-slate-500">{text.subtitle}</p>
+              <h1
+                className={`text-3xl font-black tracking-tight sm:text-4xl ${titleClass}`}
+              >
+                {t.pageTitle}
+              </h1>
+
+              <p
+                className={`mt-3 max-w-3xl text-sm leading-6 sm:text-base ${textClass}`}
+              >
+                {t.pageSubtitle}
+              </p>
             </div>
 
             <Link
-              href="/dashboard"
-              className="w-fit rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              href="/documents/new"
+              className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700"
             >
-              {text.backToDashboard}
+              {t.createDocument}
             </Link>
-          </header>
+          </div>
+        </section>
 
-          <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_380px]">
-            <form
-              onSubmit={handleGenerateText}
-              className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
-            >
-              <div className="mb-8">
-                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-2xl font-bold text-blue-600">
-                  D
-                </div>
+        <section className="min-w-0 xl:col-span-2">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className={`rounded-[1.75rem] border p-5 ${cardClass}`}>
+              <p className={`text-sm font-bold ${mutedClass}`}>
+                {t.stats.total}
+              </p>
+              <p className={`mt-3 text-3xl font-black ${titleClass}`}>
+                {stats.total}
+              </p>
+            </div>
 
-                <h2 className="text-2xl font-bold">{text.formTitle}</h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                  {text.formSubtitle}
-                </p>
-              </div>
+            <div className={`rounded-[1.75rem] border p-5 ${cardClass}`}>
+              <p className={`text-sm font-bold ${mutedClass}`}>
+                {t.stats.drafts}
+              </p>
+              <p className={`mt-3 text-3xl font-black ${titleClass}`}>
+                {stats.drafts}
+              </p>
+            </div>
 
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.documentTitle}
-                  </label>
+            <div className={`rounded-[1.75rem] border p-5 ${cardClass}`}>
+              <p className={`text-sm font-bold ${mutedClass}`}>
+                {t.stats.generated}
+              </p>
+              <p className={`mt-3 text-3xl font-black ${titleClass}`}>
+                {stats.generated}
+              </p>
+            </div>
 
-                  <input
-                    value={documentTitle}
-                    onChange={(e) => setDocumentTitle(e.target.value)}
-                    placeholder={text.documentTitlePlaceholder}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+            <div className={`rounded-[1.75rem] border p-5 ${cardClass}`}>
+              <p className={`text-sm font-bold ${mutedClass}`}>
+                {t.stats.reviewed}
+              </p>
+              <p className={`mt-3 text-3xl font-black ${titleClass}`}>
+                {stats.reviewed}
+              </p>
+            </div>
+          </div>
+        </section>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.documentType}
-                  </label>
+        <section
+          className={`min-w-0 rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}
+        >
+          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+            <div className="min-w-0">
+              <h2 className={`text-xl font-black ${titleClass}`}>
+                {t.sectionTitle}
+              </h2>
 
-                  <select
-                    value={String(documentTypeIndex)}
-                    onChange={(e) =>
-                      setDocumentTypeIndex(Number(e.target.value))
-                    }
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                  >
-                    {text.documentTypes.map((item, index) => (
-                      <option key={item} value={String(index)}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <p className={`mt-1 text-sm leading-6 ${mutedClass}`}>
+                {t.sectionSubtitle}
+              </p>
+            </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.documentLanguage}
-                  </label>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t.searchPlaceholder}
+              className={`h-11 w-full rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 lg:w-72 ${inputClass}`}
+            />
+          </div>
 
-                  <select
-                    value={String(documentLanguageIndex)}
-                    onChange={(e) =>
-                      setDocumentLanguageIndex(Number(e.target.value))
-                    }
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                  >
-                    {text.languages.map((item, index) => (
-                      <option key={item} value={String(index)}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {(
+              ["all", "draft", "generated", "reviewed", "archived"] as FilterKey[]
+            ).map((filter) => {
+              const active = activeFilter === filter;
 
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.documentStyle}
-                  </label>
-
-                  <select
-                    value={String(documentStyleIndex)}
-                    onChange={(e) =>
-                      setDocumentStyleIndex(Number(e.target.value))
-                    }
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                  >
-                    {text.styles.map((item, index) => (
-                      <option key={item} value={String(index)}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.topic}
-                  </label>
-
-                  <textarea
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder={text.topicPlaceholder}
-                    rows={6}
-                    className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.requirements}
-                  </label>
-
-                  <textarea
-                    value={requirements}
-                    onChange={(e) => setRequirements(e.target.value)}
-                    placeholder={text.requirementsPlaceholder}
-                    rows={4}
-                    className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.keywords}
-                  </label>
-
-                  <input
-                    value={keywords}
-                    onChange={(e) => setKeywords(e.target.value)}
-                    placeholder={text.keywordsPlaceholder}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {errorMessage && (
-                <div className="mt-6 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                  {errorMessage}
-                </div>
-              )}
-
-              {successMessage && (
-                <div className="mt-6 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-medium text-green-600">
-                  {successMessage}
-                </div>
-              )}
-
-              <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              return (
                 <button
-                  type="submit"
-                  className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
-                >
-                  {text.generateText}
-                </button>
-
-                <button
+                  key={filter}
                   type="button"
-                  onClick={handleSaveDocument}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  onClick={() => setActiveFilter(filter)}
+                  className={`rounded-2xl border px-4 py-2 text-sm font-black transition ${
+                    active
+                      ? "border-blue-500 bg-blue-600 text-white shadow-sm shadow-blue-600/20"
+                      : isDark
+                        ? "border-white/10 bg-slate-950/50 text-slate-300 hover:border-blue-400/30 hover:bg-blue-400/10"
+                        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-200 hover:bg-blue-50"
+                  }`}
                 >
-                  {text.saveDocument}
+                  {t.filters[filter]}
                 </button>
+              );
+            })}
+          </div>
 
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-500 transition hover:bg-slate-50"
+          <div className="mt-6 grid gap-4">
+            {filteredDocuments.length > 0 ? (
+              filteredDocuments.map((document) => (
+                <article
+                  key={document.id}
+                  className={`min-w-0 rounded-[1.75rem] border p-5 ${softCardClass}`}
                 >
-                  {text.clear}
-                </button>
-              </div>
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getStatusColor(
+                            document.status,
+                            isDark
+                          )}`}
+                        >
+                          {t.statuses[document.status]}
+                        </span>
 
-              {generatedText && (
-                <section className="mt-8 rounded-3xl border border-blue-100 bg-blue-50 p-6">
-                  <p className="text-sm font-semibold text-blue-600">
-                    {text.generatedDocument}
-                  </p>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-bold ${
+                            isDark
+                              ? "bg-white/10 text-slate-300"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {t.types[document.type]}
+                        </span>
+                      </div>
 
-                  <pre className="mt-5 whitespace-pre-wrap rounded-2xl bg-white p-5 text-sm leading-7 text-slate-700">
-                    {generatedText}
-                  </pre>
-                </section>
-              )}
-            </form>
+                      <h3 className={`mt-4 text-lg font-black ${titleClass}`}>
+                        {t.titles[document.titleKey]}
+                      </h3>
 
-            <aside className="space-y-6">
-              <div className="rounded-3xl border border-blue-100 bg-blue-50 p-6 shadow-sm">
-                <h2 className="text-xl font-bold text-blue-600">
-                  {text.frontendNoteTitle}
-                </h2>
-
-                <p className="mt-4 text-sm leading-7 text-blue-700">
-                  {text.frontendNote}
-                </p>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="space-y-4">
-                  {text.previewCards.map((card) => (
-                    <div key={card.title} className="rounded-2xl bg-slate-50 p-5">
-                      <h3 className="font-bold">{card.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        {card.text}
+                      <p className={`mt-1 text-sm font-semibold ${mutedClass}`}>
+                        {t.courses[document.courseKey]}
                       </p>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-xl font-bold">{text.savedDocuments}</h2>
-
-                {savedDocuments.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-500">
-                    {text.noSavedDocuments}
-                  </p>
-                ) : (
-                  <div className="mt-5 space-y-4">
-                    {savedDocuments.map((document) => (
-                      <div
-                        key={document.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    <div className="flex shrink-0 gap-2">
+                      <Link
+                        href={`/documents/${document.id}`}
+                        className={`inline-flex h-10 items-center justify-center rounded-2xl border px-4 text-sm font-black transition ${
+                          isDark
+                            ? "border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
                       >
-                        <h3 className="font-bold">{document.title}</h3>
+                        {t.open}
+                      </Link>
 
-                        <p className="mt-2 text-xs leading-5 text-slate-500">
-                          {document.type} · {document.language} ·{" "}
-                          {document.style}
-                        </p>
-
-                        <p className="mt-2 text-xs text-slate-400">
-                          {text.savedLocally}: {document.createdAt}
-                        </p>
-                      </div>
-                    ))}
+                      <Link
+                        href={`/documents/${document.id}`}
+                        className="inline-flex h-10 items-center justify-center rounded-2xl bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700"
+                      >
+                        {t.continue}
+                      </Link>
+                    </div>
                   </div>
-                )}
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div className={`rounded-2xl border p-4 ${softCardClass}`}>
+                      <p
+                        className={`text-xs font-bold uppercase tracking-wide ${mutedClass}`}
+                      >
+                        {t.updated}
+                      </p>
+                      <p className={`mt-1 text-sm font-black ${titleClass}`}>
+                        {formatDate(document.updatedAt)}
+                      </p>
+                    </div>
+
+                    <div className={`rounded-2xl border p-4 ${softCardClass}`}>
+                      <p
+                        className={`text-xs font-bold uppercase tracking-wide ${mutedClass}`}
+                      >
+                        {t.words}
+                      </p>
+                      <p className={`mt-1 text-sm font-black ${titleClass}`}>
+                        {formatWords(document.words)}
+                      </p>
+                    </div>
+
+                    <div className={`rounded-2xl border p-4 ${softCardClass}`}>
+                      <p
+                        className={`text-xs font-bold uppercase tracking-wide ${mutedClass}`}
+                      >
+                        {t.progress}
+                      </p>
+                      <p className={`mt-1 text-sm font-black ${titleClass}`}>
+                        {document.progress}%
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`mt-4 h-3 overflow-hidden rounded-full ${
+                      isDark ? "bg-slate-950" : "bg-slate-200"
+                    }`}
+                  >
+                    <div
+                      className="h-full rounded-full bg-blue-600"
+                      style={{ width: `${document.progress}%` }}
+                    />
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div
+                className={`rounded-[1.75rem] border p-8 text-center ${softCardClass}`}
+              >
+                <div
+                  className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-xl ${
+                    isDark ? "bg-blue-500/15" : "bg-blue-600/10"
+                  }`}
+                >
+                  🔎
+                </div>
+
+                <h3 className={`mt-4 text-xl font-black ${titleClass}`}>
+                  {t.emptyTitle}
+                </h3>
+
+                <p
+                  className={`mx-auto mt-2 max-w-md text-sm leading-6 ${mutedClass}`}
+                >
+                  {t.emptySubtitle}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveFilter("all");
+                    setSearch("");
+                  }}
+                  className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white transition hover:bg-blue-700"
+                >
+                  {t.resetFilters}
+                </button>
               </div>
-            </aside>
+            )}
           </div>
-        </div>
-      </section>
-    </main>
+        </section>
+
+        <aside className="grid min-w-0 gap-6">
+          <section className={`rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
+            <div className="min-w-0">
+              <h2 className={`text-xl font-black ${titleClass}`}>
+                {t.recentTitle}
+              </h2>
+
+              <p className={`mt-1 text-sm leading-6 ${mutedClass}`}>
+                {t.recentSubtitle}
+              </p>
+            </div>
+
+            {recentDocument && (
+              <div className={`mt-5 rounded-3xl border p-4 ${softCardClass}`}>
+                <span
+                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getStatusColor(
+                    recentDocument.status,
+                    isDark
+                  )}`}
+                >
+                  {t.statuses[recentDocument.status]}
+                </span>
+
+                <h3 className={`mt-4 text-base font-black ${titleClass}`}>
+                  {t.titles[recentDocument.titleKey]}
+                </h3>
+
+                <p className={`mt-1 text-sm font-semibold ${mutedClass}`}>
+                  {t.courses[recentDocument.courseKey]}
+                </p>
+
+                <div className={`mt-4 rounded-2xl border p-4 ${softCardClass}`}>
+                  <p
+                    className={`text-xs font-bold uppercase tracking-wide ${mutedClass}`}
+                  >
+                    {t.updated}
+                  </p>
+                  <p className={`mt-1 text-sm font-black ${titleClass}`}>
+                    {formatDate(recentDocument.updatedAt)}
+                  </p>
+                </div>
+
+                <div className={`mt-3 rounded-2xl border p-4 ${softCardClass}`}>
+                  <p
+                    className={`text-xs font-bold uppercase tracking-wide ${mutedClass}`}
+                  >
+                    {t.typesTitle}
+                  </p>
+                  <p className={`mt-1 text-sm font-black ${titleClass}`}>
+                    {t.types[recentDocument.type]}
+                  </p>
+                </div>
+
+                <Link
+                  href={`/documents/${recentDocument.id}`}
+                  className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-blue-600 text-sm font-black text-white transition hover:bg-blue-700"
+                >
+                  {t.continue}
+                </Link>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-600 p-6 text-white shadow-sm shadow-blue-600/20">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-xl">
+              ✨
+            </div>
+
+            <h2 className="mt-5 text-xl font-black">{t.assistantTitle}</h2>
+
+            <p className="mt-2 text-sm font-medium leading-6 text-blue-100">
+              {t.assistantSubtitle}
+            </p>
+
+            <div className="mt-5 grid gap-2">
+              <Link
+                href="/ai-tutor"
+                className="inline-flex h-10 items-center justify-center rounded-2xl bg-white text-sm font-black text-blue-700 transition hover:bg-blue-50"
+              >
+                {t.createEssay}
+              </Link>
+
+              <Link
+                href="/ai-tutor"
+                className="inline-flex h-10 items-center justify-center rounded-2xl bg-white/15 text-sm font-black text-white transition hover:bg-white/20"
+              >
+                {t.summarizeText}
+              </Link>
+
+              <Link
+                href="/ai-tutor"
+                className="inline-flex h-10 items-center justify-center rounded-2xl bg-white/15 text-sm font-black text-white transition hover:bg-white/20"
+              >
+                {t.improveDraft}
+              </Link>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <AppShell>
+      <DocumentsContent />
+    </AppShell>
   );
 }

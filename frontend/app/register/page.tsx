@@ -1,153 +1,435 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import AuthShell, {
+  type AuthLanguage,
+  type AuthTheme,
+} from "@/components/AuthShell";
+import { supabase } from "@/lib/supabaseClient";
+
+type RegisterCopy = {
+  shell: {
+    badge: string;
+    title: string;
+    subtitle: string;
+    benefitAiTutor: string;
+    benefitAssignments: string;
+    benefitExamPrep: string;
+    previewTitle: string;
+    previewSubtitle: string;
+    previewCardOne: string;
+    previewCardTwo: string;
+    previewCardThree: string;
+  };
+  form: {
+    badge: string;
+    title: string;
+    subtitle: string;
+    email: string;
+    emailPlaceholder: string;
+    password: string;
+    passwordPlaceholder: string;
+    confirmPassword: string;
+    confirmPasswordPlaceholder: string;
+    submit: string;
+    loading: string;
+    hasAccount: string;
+    login: string;
+    passwordMismatch: string;
+    successTitle: string;
+    successText: string;
+    errorFallback: string;
+    supabaseMissing: string;
+  };
+};
+
+const copy: Record<AuthLanguage, RegisterCopy> = {
+  en: {
+    shell: {
+      badge: "Academic AI workspace",
+      title: "Build your study system with AI.",
+      subtitle:
+        "Start with AI Tutor, assignment tracking, exam preparation, and document tools in one workspace.",
+      benefitAiTutor: "Clear explanations for difficult topics",
+      benefitAssignments: "Organized assignment workflow",
+      benefitExamPrep: "Exam preparation with practice plans",
+      previewTitle: "Your workspace starts here",
+      previewSubtitle: "Create an account and continue building StudyAI.",
+      previewCardOne: "Tutor",
+      previewCardTwo: "Tasks",
+      previewCardThree: "Files",
+    },
+    form: {
+      badge: "Create account",
+      title: "Join StudyAI",
+      subtitle: "Create your account and start organizing your study workflow.",
+      email: "Email",
+      emailPlaceholder: "you@example.com",
+      password: "Password",
+      passwordPlaceholder: "Create a password",
+      confirmPassword: "Confirm password",
+      confirmPasswordPlaceholder: "Repeat your password",
+      submit: "Create account",
+      loading: "Creating account...",
+      hasAccount: "Already have an account?",
+      login: "Log in",
+      passwordMismatch: "Passwords do not match.",
+      successTitle: "Check your email",
+      successText:
+        "Your account was created. Confirm your email if Supabase email confirmation is enabled.",
+      errorFallback: "Could not create account. Try again.",
+      supabaseMissing: "Supabase client is not configured.",
+    },
+  },
+  ru: {
+    shell: {
+      badge: "Academic AI workspace",
+      title: "Создай свою учебную систему с AI.",
+      subtitle:
+        "Начни с AI Tutor, отслеживания заданий, подготовки к экзаменам и работы с документами в одном workspace.",
+      benefitAiTutor: "Понятные объяснения сложных тем",
+      benefitAssignments: "Организованный workflow для заданий",
+      benefitExamPrep: "Подготовка к экзаменам по плану",
+      previewTitle: "Твой workspace начинается здесь",
+      previewSubtitle: "Создай аккаунт и продолжи развивать StudyAI.",
+      previewCardOne: "Tutor",
+      previewCardTwo: "Задачи",
+      previewCardThree: "Файлы",
+    },
+    form: {
+      badge: "Создание аккаунта",
+      title: "Присоединиться к StudyAI",
+      subtitle:
+        "Создай аккаунт и начни организовывать свой учебный процесс.",
+      email: "Email",
+      emailPlaceholder: "you@example.com",
+      password: "Пароль",
+      passwordPlaceholder: "Создайте пароль",
+      confirmPassword: "Подтвердите пароль",
+      confirmPasswordPlaceholder: "Повторите пароль",
+      submit: "Создать аккаунт",
+      loading: "Создание аккаунта...",
+      hasAccount: "Уже есть аккаунт?",
+      login: "Войти",
+      passwordMismatch: "Пароли не совпадают.",
+      successTitle: "Проверь email",
+      successText:
+        "Аккаунт создан. Подтверди email, если в Supabase включено подтверждение почты.",
+      errorFallback: "Не удалось создать аккаунт. Попробуй снова.",
+      supabaseMissing: "Supabase client не настроен.",
+    },
+  },
+  kz: {
+    shell: {
+      badge: "Academic AI workspace",
+      title: "AI арқылы оқу жүйеңізді жасаңыз.",
+      subtitle:
+        "AI Tutor, тапсырма бақылау, емтиханға дайындық және құжат құралдарын бір workspace ішінде қолданыңыз.",
+      benefitAiTutor: "Күрделі тақырыптарға түсінікті жауаптар",
+      benefitAssignments: "Тапсырмаларға арналған жүйелі workflow",
+      benefitExamPrep: "Жоспар бойынша емтиханға дайындық",
+      previewTitle: "Workspace осы жерден басталады",
+      previewSubtitle: "Аккаунт жасап, StudyAI жұмысын жалғастырыңыз.",
+      previewCardOne: "Tutor",
+      previewCardTwo: "Тапсырмалар",
+      previewCardThree: "Файлдар",
+    },
+    form: {
+      badge: "Аккаунт жасау",
+      title: "StudyAI-ға қосылу",
+      subtitle: "Аккаунт жасап, оқу процесіңізді ұйымдастыруды бастаңыз.",
+      email: "Email",
+      emailPlaceholder: "you@example.com",
+      password: "Құпиясөз",
+      passwordPlaceholder: "Құпиясөз жасаңыз",
+      confirmPassword: "Құпиясөзді растау",
+      confirmPasswordPlaceholder: "Құпиясөзді қайталаңыз",
+      submit: "Аккаунт жасау",
+      loading: "Аккаунт жасалуда...",
+      hasAccount: "Аккаунтыңыз бар ма?",
+      login: "Кіру",
+      passwordMismatch: "Құпиясөздер сәйкес емес.",
+      successTitle: "Email тексеріңіз",
+      successText:
+        "Аккаунт жасалды. Supabase email растауы қосулы болса, поштаңызды растаңыз.",
+      errorFallback: "Аккаунт жасау мүмкін болмады. Қайта көріңіз.",
+      supabaseMissing: "Supabase client бапталмаған.",
+    },
+  },
+};
+
+const languageStorageKeys = [
+  "studyai-language",
+  "studyai_lang",
+  "language",
+  "locale",
+];
+
+const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
+
+function getStoredLanguage(): AuthLanguage {
+  if (typeof window === "undefined") return "ru";
+
+  for (const key of languageStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "en" || value === "ru" || value === "kz") {
+      return value;
+    }
+  }
+
+  return "ru";
+}
+
+function getStoredTheme(): AuthTheme {
+  if (typeof window === "undefined") return "dark";
+
+  for (const key of themeStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "light" || value === "dark") {
+      return value;
+    }
+  }
+
+  return "dark";
+}
+
+function saveValueToStorage(keys: string[], value: string) {
+  if (typeof window === "undefined") return;
+
+  for (const key of keys) {
+    window.localStorage.setItem(key, value);
+  }
+}
+
+function applyTheme(theme: AuthTheme) {
+  if (typeof document === "undefined") return;
+
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.dataset.theme = theme;
+  document.body.style.backgroundColor = theme === "dark" ? "#020617" : "#f8fafc";
+}
 
 export default function RegisterPage() {
   const router = useRouter();
 
-  const [fullName, setFullName] = useState("");
+  const [language, setLanguage] = useState<AuthLanguage>("ru");
+  const [theme, setTheme] = useState<AuthTheme>("dark");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const [loading, setLoading] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  async function handleRegister() {
-    if (!fullName.trim() || !email.trim() || !password.trim()) {
-      setErrorMessage("Please fill in all fields.");
-      return;
-    }
+  const t = copy[language];
+  const isDark = theme === "dark";
 
-    setLoading(true);
+  useEffect(() => {
+    const storedLanguage = getStoredLanguage();
+    const storedTheme = getStoredTheme();
+
+    setLanguage(storedLanguage);
+    setTheme(storedTheme);
+    saveValueToStorage(languageStorageKeys, storedLanguage);
+    saveValueToStorage(themeStorageKeys, storedTheme);
+    applyTheme(storedTheme);
+  }, []);
+
+  function handleLanguageChange(nextLanguage: AuthLanguage) {
+    setLanguage(nextLanguage);
+    saveValueToStorage(languageStorageKeys, nextLanguage);
+
+    window.dispatchEvent(
+      new CustomEvent("studyai:language-change", {
+        detail: nextLanguage,
+      })
+    );
+  }
+
+  function handleThemeToggle() {
+    const nextTheme: AuthTheme = theme === "dark" ? "light" : "dark";
+
+    setTheme(nextTheme);
+    saveValueToStorage(themeStorageKeys, nextTheme);
+    applyTheme(nextTheme);
+
+    window.dispatchEvent(
+      new CustomEvent("studyai:theme-change", {
+        detail: nextTheme,
+      })
+    );
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setErrorMessage("");
     setSuccessMessage("");
 
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    });
-
-    if (error) {
-      setErrorMessage(error.message);
-      setLoading(false);
+    if (password !== confirmPassword) {
+      setErrorMessage(t.form.passwordMismatch);
       return;
     }
 
-    if (data.user) {
-      await supabase
-        .from("profiles")
-        .update({
-          full_name: fullName.trim(),
-        })
-        .eq("id", data.user.id);
+    setIsSubmitting(true);
+
+    try {
+      if (!supabase) {
+        throw new Error(t.form.supabaseMissing);
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setSuccessMessage(t.form.successText);
+
+      window.setTimeout(() => {
+        router.replace("/login");
+      }, 1600);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : t.form.errorFallback
+      );
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setSuccessMessage("Account created successfully. You can now log in.");
-    setLoading(false);
-
-    setTimeout(() => {
-      router.push("/login");
-    }, 1000);
   }
 
+  const titleClass = isDark ? "text-white" : "text-slate-950";
+  const textClass = isDark ? "text-slate-300" : "text-slate-600";
+  const mutedClass = isDark ? "text-slate-400" : "text-slate-500";
+  const inputClass = isDark
+    ? "border-white/10 bg-slate-950/70 text-white placeholder:text-slate-500 focus:border-blue-400 focus:ring-blue-500/10"
+    : "border-slate-200 bg-white text-slate-950 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/10";
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 text-slate-900">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <Link
-          href="/"
-          className="mb-8 inline-block text-2xl font-bold text-slate-900"
-        >
-          StudyAI
-        </Link>
-
-        <h1 className="text-3xl font-bold text-slate-900">Create account</h1>
-
-        <p className="mt-2 text-sm text-slate-500">
-          Join StudyAI and start learning smarter.
-        </p>
-
-        <div className="mt-8 space-y-5">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Full name
-            </label>
-
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Your full name"
-              autoComplete="name"
-            />
+    <AuthShell
+      language={language}
+      theme={theme}
+      copy={t.shell}
+      onLanguageChange={handleLanguageChange}
+      onThemeToggle={handleThemeToggle}
+    >
+      <div>
+        <div className="mb-8">
+          <div
+            className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${
+              isDark
+                ? "border-blue-400/20 bg-blue-400/10 text-blue-200"
+                : "border-blue-100 bg-blue-50 text-blue-700"
+            }`}
+          >
+            <span className="h-2 w-2 rounded-full bg-blue-500" />
+            {t.form.badge}
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Email
-            </label>
+          <h1 className={`text-3xl font-black tracking-tight ${titleClass}`}>
+            {t.form.title}
+          </h1>
 
+          <p className={`mt-2 text-sm leading-6 ${textClass}`}>
+            {t.form.subtitle}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="grid gap-5">
+          <label className="grid gap-2">
+            <span className={`text-sm font-bold ${titleClass}`}>
+              {t.form.email}
+            </span>
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="you@example.com"
-              autoComplete="email"
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder={t.form.emailPlaceholder}
+              required
+              className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
             />
-          </div>
+          </label>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Password
-            </label>
-
+          <label className="grid gap-2">
+            <span className={`text-sm font-bold ${titleClass}`}>
+              {t.form.password}
+            </span>
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Create a password"
-              autoComplete="new-password"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder={t.form.passwordPlaceholder}
+              required
+              minLength={6}
+              className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
             />
-          </div>
+          </label>
+
+          <label className="grid gap-2">
+            <span className={`text-sm font-bold ${titleClass}`}>
+              {t.form.confirmPassword}
+            </span>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              placeholder={t.form.confirmPasswordPlaceholder}
+              required
+              minLength={6}
+              className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+            />
+          </label>
 
           {errorMessage && (
-            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+            <div
+              className={`rounded-2xl border p-4 text-sm font-semibold ${
+                isDark
+                  ? "border-red-400/20 bg-red-400/10 text-red-100"
+                  : "border-red-100 bg-red-50 text-red-700"
+              }`}
+            >
               {errorMessage}
             </div>
           )}
 
           {successMessage && (
-            <div className="rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-medium text-green-600">
-              {successMessage}
+            <div
+              className={`rounded-2xl border p-4 text-sm font-semibold ${
+                isDark
+                  ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+                  : "border-emerald-100 bg-emerald-50 text-emerald-700"
+              }`}
+            >
+              <p className="font-black">{t.form.successTitle}</p>
+              <p className="mt-1">{successMessage}</p>
             </div>
           )}
 
           <button
-            type="button"
-            onClick={handleRegister}
-            disabled={loading}
-            className="w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            type="submit"
+            disabled={isSubmitting}
+            className="inline-flex h-12 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {loading ? "Creating account..." : "Create account"}
+            {isSubmitting ? t.form.loading : t.form.submit}
           </button>
-        </div>
+        </form>
 
-        <p className="mt-6 text-center text-sm text-slate-500">
-          Already have an account?{" "}
+        <p className={`mt-6 text-center text-sm font-semibold ${mutedClass}`}>
+          {t.form.hasAccount}{" "}
           <Link
             href="/login"
-            className="font-semibold text-blue-600 hover:text-blue-700"
+            className="font-black text-blue-600 hover:text-blue-700"
           >
-            Login
+            {t.form.login}
           </Link>
         </p>
       </div>
-    </main>
+    </AuthShell>
   );
 }

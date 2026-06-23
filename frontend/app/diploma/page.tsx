@@ -1,800 +1,863 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import Link from "next/link";
-import AppSidebar from "@/components/AppSidebar";
-import { useLanguage } from "@/components/LanguageProvider";
+import { useEffect, useMemo, useState } from "react";
+import AppShell from "@/components/AppShell";
 
-const initialProgress = {
-  introduction: false,
-  literature: false,
-  methodology: false,
-  analysis: false,
-  discussion: false,
-  conclusion: false,
-  references: false,
+type Language = "en" | "ru" | "kz";
+type Theme = "light" | "dark";
+type ResearchType = "mixed" | "quantitative" | "qualitative" | "theoretical";
+type ChapterStatus = "notStarted" | "inProgress" | "draftReady" | "reviewed";
+
+type DiplomaForm = {
+  topic: string;
+  faculty: string;
+  researchArea: string;
+  supervisor: string;
+  deadline: string;
+  researchType: ResearchType;
+  researchGoal: string;
+  objectives: string;
 };
 
-const pageText = {
+type ChapterKey =
+  | "introduction"
+  | "literature"
+  | "methodology"
+  | "results"
+  | "discussion"
+  | "conclusion";
+
+type Copy = {
+  pageBadge: string;
+  pageTitle: string;
+  pageSubtitle: string;
+  overallProgress: string;
+  workspaceTitle: string;
+  workspaceSubtitle: string;
+  topic: string;
+  topicPlaceholder: string;
+  faculty: string;
+  facultyPlaceholder: string;
+  researchArea: string;
+  researchAreaPlaceholder: string;
+  supervisor: string;
+  supervisorPlaceholder: string;
+  deadline: string;
+  deadlinePlaceholder: string;
+  researchType: string;
+  researchGoal: string;
+  researchGoalPlaceholder: string;
+  objectives: string;
+  objectivesPlaceholder: string;
+  saveDraft: string;
+  generateStructure: string;
+  structureTitle: string;
+  structureSubtitle: string;
+  chapterProgressTitle: string;
+  chapterProgressSubtitle: string;
+  storedLocally: string;
+  status: string;
+  chaptersCompleted: string;
+  progressHint: string;
+  researchTypes: Record<ResearchType, string>;
+  statuses: Record<ChapterStatus, string>;
+  structure: Record<ChapterKey, string>;
+  chapterTitles: Record<ChapterKey, string>;
+  tipsTitle: string;
+  tipsSubtitle: string;
+  tips: string[];
+};
+
+const copy: Record<Language, Copy> = {
   en: {
-    title: "Diploma",
-    subtitle: "Create a diploma workspace, define your topic, and generate a thesis structure.",
-    formTitle: "Diploma Assistant",
-    formSubtitle:
-      "Create a workspace for your diploma thesis and organize your topic, goals, tasks, structure, and section progress.",
+    pageBadge: "Diploma workspace",
+    pageTitle: "Manage your diploma work in one place",
+    pageSubtitle:
+      "Define your topic, goals, research questions, methodology, and chapter progress. Keep your thesis organized from the first idea to final submission.",
+    overallProgress: "Overall progress",
     workspaceTitle: "Diploma workspace",
+    workspaceSubtitle:
+      "Add your diploma details to generate a structured thesis plan and track your progress.",
     topic: "Diploma topic",
-    topicPlaceholder: "Example: Performance Comparison of Relational and Graph Databases",
-    faculty: "Faculty / Program",
-    facultyPlaceholder: "Example: Economics and Management",
+    topicPlaceholder: "e.g. The impact of AI on university education",
+    faculty: "Faculty / program",
+    facultyPlaceholder: "e.g. Computer Science, Economics",
     researchArea: "Research area",
-    researchAreaPlaceholder: "Example: Information Systems, AI, Data Analysis",
+    researchAreaPlaceholder: "e.g. Artificial Intelligence in Education",
     supervisor: "Supervisor",
-    supervisorPlaceholder: "Example: Dr. John Smith",
-    deadline: "Deadline",
-    deadlinePlaceholder: "MM/DD/YYYY",
+    supervisorPlaceholder: "e.g. Dr. John Smith",
+    deadline: "Final deadline",
+    deadlinePlaceholder: "DD.MM.YY",
     researchType: "Research type",
-    goal: "Main goal",
-    goalPlaceholder: "Describe the main objective of your diploma thesis...",
-    tasks: "Research tasks",
-    tasksPlaceholder: "Write the main tasks of your thesis, each on a new line...",
-    notes: "Notes",
-    notesPlaceholder: "Add important notes, requirements, or university instructions...",
-    generateStructure: "Generate diploma structure",
-    saveProgress: "Save progress",
-    clear: "Clear",
-    generatedStructure: "Generated Diploma Structure",
-    sectionProgress: "Section Progress",
-    progressSaved: "Progress saved successfully.",
-    structureReady: "Diploma structure generated successfully.",
-    required: "Please fill in the diploma topic, main goal, and research tasks.",
-    backToDashboard: "Back to Dashboard",
-    frontendNoteTitle: "Frontend status",
-    frontendNote:
-      "This page includes the frontend UI for diploma workspace creation, topic setup, goal and task definition, diploma structure generation preview, and section progress tracking. Real saving to database or AI generation can be connected later through backend/API.",
-    progress: "Progress",
-    complete: "complete",
-    researchTypes: [
-      "Theoretical research",
-      "Practical research",
-      "Case study",
-      "Data analysis",
-      "System design",
-      "Comparative study",
-    ],
-    previewCards: [
-      {
-        title: "Diploma workspace",
-        text: "Keep topic, supervisor, deadline, goals, and notes in one place.",
-      },
-      {
-        title: "Thesis structure",
-        text: "Generate a standard diploma structure with academic sections.",
-      },
-      {
-        title: "Section progress",
-        text: "Track which parts of the diploma are completed.",
-      },
-    ],
-    sections: [
-      {
-        id: "introduction",
-        title: "Introduction",
-        description:
-          "Introduce the topic, problem, motivation, objectives, and research questions.",
-        output:
-          "Explain why the topic is important, what problem is being solved, and what the thesis aims to achieve.",
-      },
-      {
-        id: "literature",
-        title: "Literature Review",
-        description:
-          "Summarize academic sources, theories, existing studies, and key concepts.",
-        output:
-          "Compare existing research and identify the gap that your diploma thesis addresses.",
-      },
-      {
-        id: "methodology",
-        title: "Methodology",
-        description:
-          "Describe research methods, data sources, tools, and evaluation approach.",
-        output:
-          "Explain how the research will be performed and why the selected method is suitable.",
-      },
-      {
-        id: "analysis",
-        title: "Analysis / Results",
-        description:
-          "Present practical work, collected data, calculations, experiments, or findings.",
-        output:
-          "Show the main results and connect them to your research tasks.",
-      },
-      {
-        id: "discussion",
-        title: "Discussion",
-        description:
-          "Interpret the results, compare them with expectations, and discuss limitations.",
-        output:
-          "Explain what the results mean and what limitations should be considered.",
-      },
-      {
-        id: "conclusion",
-        title: "Conclusion",
-        description:
-          "Summarize the thesis, answer research questions, and suggest future work.",
-        output:
-          "Clearly state what was achieved and how the thesis objective was fulfilled.",
-      },
-      {
-        id: "references",
-        title: "References",
-        description:
-          "List all academic sources, books, articles, websites, and datasets.",
-        output:
-          "Prepare references according to the required citation style.",
-      },
+    researchGoal: "Research goal",
+    researchGoalPlaceholder: "Describe the main goal of your diploma work...",
+    objectives: "Research objectives",
+    objectivesPlaceholder: "Write 3–5 objectives, each on a new line...",
+    saveDraft: "Save draft",
+    generateStructure: "Generate structure",
+    structureTitle: "Generated diploma structure",
+    structureSubtitle:
+      "This is a frontend preview. Later, real AI structure generation will be connected through backend/API.",
+    chapterProgressTitle: "Chapter progress",
+    chapterProgressSubtitle:
+      "Update chapter statuses and track overall diploma progress.",
+    storedLocally: "Progress is stored locally for frontend preview.",
+    status: "Status",
+    chaptersCompleted: "chapters completed",
+    progressHint: "Based on reviewed chapters.",
+    researchTypes: {
+      mixed: "Mixed methods",
+      quantitative: "Quantitative research",
+      qualitative: "Qualitative research",
+      theoretical: "Theoretical research",
+    },
+    statuses: {
+      notStarted: "Not started",
+      inProgress: "In progress",
+      draftReady: "Draft ready",
+      reviewed: "Reviewed",
+    },
+    structure: {
+      introduction:
+        "Introduction: define the problem, research goal, objectives, and relevance.",
+      literature:
+        "Literature Review: summarize existing research and identify the research gap.",
+      methodology:
+        "Methodology: explain data sources, methods, tools, and limitations.",
+      results:
+        "Results / Analysis: present findings clearly with tables, charts, or examples.",
+      discussion:
+        "Discussion: connect findings with research questions and literature.",
+      conclusion:
+        "Conclusion: summarize the contribution and suggest future research.",
+    },
+    chapterTitles: {
+      introduction: "Introduction",
+      literature: "Literature Review",
+      methodology: "Methodology",
+      results: "Results / Analysis",
+      discussion: "Discussion",
+      conclusion: "Conclusion",
+    },
+    tipsTitle: "Diploma tips",
+    tipsSubtitle: "Small reminders to keep your thesis clear and manageable.",
+    tips: [
+      "Keep your research question narrow and measurable.",
+      "Write the methodology before collecting final results.",
+      "Use one consistent citation style from the beginning.",
+      "Track supervisor feedback after every meeting.",
     ],
   },
-
   ru: {
-    title: "Диплом",
-    subtitle: "Создайте дипломный workspace, добавьте тему и сгенерируйте структуру.",
-    formTitle: "Diploma Assistant",
-    formSubtitle:
-      "Создайте рабочее пространство для диплома и организуйте тему, цели, задачи, структуру и прогресс по разделам.",
-    workspaceTitle: "Дипломный workspace",
-    topic: "Тема диплома",
-    topicPlaceholder: "Например: Сравнение производительности реляционных и графовых баз данных",
+    pageBadge: "Diploma workspace",
+    pageTitle: "Управляй дипломной работой в одном месте",
+    pageSubtitle:
+      "Определи тему, цели, исследовательские вопросы, методологию и прогресс по главам. Держи дипломную работу в порядке от первой идеи до финальной сдачи.",
+    overallProgress: "Общий прогресс",
+    workspaceTitle: "Рабочая область диплома",
+    workspaceSubtitle:
+      "Добавь данные дипломной работы, чтобы сформировать структуру и отслеживать прогресс.",
+    topic: "Тема дипломной работы",
+    topicPlaceholder: "например: Влияние AI на университетское образование",
     faculty: "Факультет / программа",
-    facultyPlaceholder: "Например: Экономика и менеджмент",
+    facultyPlaceholder: "например: Computer Science, Economics",
     researchArea: "Область исследования",
-    researchAreaPlaceholder: "Например: Информационные системы, AI, анализ данных",
+    researchAreaPlaceholder: "например: Artificial Intelligence in Education",
     supervisor: "Научный руководитель",
-    supervisorPlaceholder: "Например: Dr. John Smith",
-    deadline: "Дедлайн",
+    supervisorPlaceholder: "например: Dr. John Smith",
+    deadline: "Финальный дедлайн",
     deadlinePlaceholder: "ДД.ММ.ГГ",
     researchType: "Тип исследования",
-    goal: "Главная цель",
-    goalPlaceholder: "Опишите главную цель вашей дипломной работы...",
-    tasks: "Задачи исследования",
-    tasksPlaceholder: "Напишите основные задачи диплома, каждую с новой строки...",
-    notes: "Заметки",
-    notesPlaceholder: "Добавьте важные заметки, требования или инструкции университета...",
-    generateStructure: "Сгенерировать структуру диплома",
-    saveProgress: "Сохранить прогресс",
-    clear: "Очистить",
-    generatedStructure: "Сгенерированная структура диплома",
-    sectionProgress: "Прогресс по разделам",
-    progressSaved: "Прогресс успешно сохранён.",
-    structureReady: "Структура диплома успешно сгенерирована.",
-    required: "Пожалуйста, заполните тему диплома, главную цель и задачи исследования.",
-    backToDashboard: "Назад в панель",
-    frontendNoteTitle: "Frontend статус",
-    frontendNote:
-      "Эта страница содержит frontend UI для создания дипломного workspace, добавления темы, целей и задач, предварительной генерации структуры диплома и отслеживания прогресса по разделам. Реальное сохранение в базу данных или AI-генерацию можно подключить позже через backend/API.",
-    progress: "Прогресс",
-    complete: "готово",
-    researchTypes: [
-      "Теоретическое исследование",
-      "Практическое исследование",
-      "Кейс-стади",
-      "Анализ данных",
-      "Проектирование системы",
-      "Сравнительное исследование",
-    ],
-    previewCards: [
-      {
-        title: "Дипломный workspace",
-        text: "Храните тему, руководителя, дедлайн, цели и заметки в одном месте.",
-      },
-      {
-        title: "Структура диплома",
-        text: "Генерируйте стандартную академическую структуру дипломной работы.",
-      },
-      {
-        title: "Прогресс разделов",
-        text: "Отмечайте, какие части диплома уже выполнены.",
-      },
-    ],
-    sections: [
-      {
-        id: "introduction",
-        title: "Введение",
-        description:
-          "Представьте тему, проблему, мотивацию, цели и исследовательские вопросы.",
-        output:
-          "Объясните, почему тема важна, какую проблему решает диплом и чего работа должна достичь.",
-      },
-      {
-        id: "literature",
-        title: "Обзор литературы",
-        description:
-          "Соберите академические источники, теории, существующие исследования и ключевые понятия.",
-        output:
-          "Сравните существующие исследования и покажите пробел, который закрывает ваша работа.",
-      },
-      {
-        id: "methodology",
-        title: "Методология",
-        description:
-          "Опишите методы исследования, источники данных, инструменты и подход к оценке.",
-        output:
-          "Объясните, как будет проводиться исследование и почему выбранный метод подходит.",
-      },
-      {
-        id: "analysis",
-        title: "Анализ / результаты",
-        description:
-          "Представьте практическую часть, данные, расчёты, эксперименты или результаты.",
-        output:
-          "Покажите основные результаты и свяжите их с задачами исследования.",
-      },
-      {
-        id: "discussion",
-        title: "Обсуждение",
-        description:
-          "Интерпретируйте результаты, сравните их с ожиданиями и укажите ограничения.",
-        output:
-          "Объясните значение результатов и ограничения, которые нужно учитывать.",
-      },
-      {
-        id: "conclusion",
-        title: "Заключение",
-        description:
-          "Подведите итоги, ответьте на исследовательские вопросы и предложите будущие направления.",
-        output:
-          "Чётко укажите, что было достигнуто и как выполнена цель диплома.",
-      },
-      {
-        id: "references",
-        title: "Список литературы",
-        description:
-          "Укажите все академические источники, книги, статьи, сайты и датасеты.",
-        output:
-          "Подготовьте источники в нужном стиле цитирования.",
-      },
+    researchGoal: "Цель исследования",
+    researchGoalPlaceholder: "Опиши главную цель дипломной работы...",
+    objectives: "Задачи исследования",
+    objectivesPlaceholder: "Напиши 3–5 задач, каждую с новой строки...",
+    saveDraft: "Сохранить черновик",
+    generateStructure: "Создать структуру",
+    structureTitle: "Сгенерированная структура диплома",
+    structureSubtitle:
+      "Это frontend-preview. Позже реальная AI-генерация структуры будет подключена через backend/API.",
+    chapterProgressTitle: "Прогресс по главам",
+    chapterProgressSubtitle:
+      "Обновляй статусы глав и отслеживай общий прогресс диплома.",
+    storedLocally: "Прогресс сохраняется локально для frontend-preview.",
+    status: "Статус",
+    chaptersCompleted: "глав завершено",
+    progressHint: "На основе проверенных глав.",
+    researchTypes: {
+      mixed: "Смешанные методы",
+      quantitative: "Количественное исследование",
+      qualitative: "Качественное исследование",
+      theoretical: "Теоретическое исследование",
+    },
+    statuses: {
+      notStarted: "Не начато",
+      inProgress: "В процессе",
+      draftReady: "Черновик готов",
+      reviewed: "Проверено",
+    },
+    structure: {
+      introduction:
+        "Введение: определить проблему, цель исследования, задачи и актуальность.",
+      literature:
+        "Обзор литературы: обобщить существующие исследования и найти research gap.",
+      methodology:
+        "Методология: описать источники данных, методы, инструменты и ограничения.",
+      results:
+        "Результаты / анализ: ясно представить выводы с таблицами, графиками или примерами.",
+      discussion:
+        "Обсуждение: связать результаты с исследовательскими вопросами и литературой.",
+      conclusion:
+        "Заключение: обобщить вклад работы и предложить направления будущих исследований.",
+    },
+    chapterTitles: {
+      introduction: "Введение",
+      literature: "Обзор литературы",
+      methodology: "Методология",
+      results: "Результаты / анализ",
+      discussion: "Обсуждение",
+      conclusion: "Заключение",
+    },
+    tipsTitle: "Советы по диплому",
+    tipsSubtitle: "Короткие напоминания, чтобы работа оставалась понятной.",
+    tips: [
+      "Сделай исследовательский вопрос узким и измеримым.",
+      "Опиши методологию до финального анализа результатов.",
+      "Используй один стиль цитирования с самого начала.",
+      "Фиксируй комментарии научного руководителя после каждой встречи.",
     ],
   },
-
   kz: {
-    title: "Диплом",
-    subtitle: "Диплом workspace құрып, тақырып қосып, құрылым жасаңыз.",
-    formTitle: "Diploma Assistant",
-    formSubtitle:
-      "Диплом жұмысы үшін жұмыс кеңістігін құрып, тақырып, мақсат, міндеттер, құрылым және бөлімдер прогресін ұйымдастырыңыз.",
-    workspaceTitle: "Диплом workspace",
+    pageBadge: "Diploma workspace",
+    pageTitle: "Диплом жұмысын бір жерде басқарыңыз",
+    pageSubtitle:
+      "Тақырыпты, мақсаттарды, зерттеу сұрақтарын, әдістемені және тараулардың прогресін анықтаңыз. Диплом жұмысын алғашқы идеядан финалдық тапсыруға дейін реттеп ұстаңыз.",
+    overallProgress: "Жалпы прогресс",
+    workspaceTitle: "Диплом жұмыс аймағы",
+    workspaceSubtitle:
+      "Диплом деректерін қосып, құрылым жасап, прогресті бақылаңыз.",
     topic: "Диплом тақырыбы",
-    topicPlaceholder: "Мысалы: Реляциялық және графтық дерекқорлардың өнімділігін салыстыру",
+    topicPlaceholder: "мысалы: AI-дың университет білім беруіне әсері",
     faculty: "Факультет / бағдарлама",
-    facultyPlaceholder: "Мысалы: Экономика және менеджмент",
-    researchArea: "Зерттеу саласы",
-    researchAreaPlaceholder: "Мысалы: Ақпараттық жүйелер, AI, деректер талдауы",
+    facultyPlaceholder: "мысалы: Computer Science, Economics",
+    researchArea: "Зерттеу бағыты",
+    researchAreaPlaceholder: "мысалы: Artificial Intelligence in Education",
     supervisor: "Ғылыми жетекші",
-    supervisorPlaceholder: "Мысалы: Dr. John Smith",
-    deadline: "Дедлайн",
-    deadlinePlaceholder: "ДД.ММ.ГГ",
+    supervisorPlaceholder: "мысалы: Dr. John Smith",
+    deadline: "Финалдық дедлайн",
+    deadlinePlaceholder: "КК.АА.ЖЖ",
     researchType: "Зерттеу түрі",
-    goal: "Негізгі мақсат",
-    goalPlaceholder: "Диплом жұмысының негізгі мақсатын сипаттаңыз...",
-    tasks: "Зерттеу міндеттері",
-    tasksPlaceholder: "Дипломның негізгі міндеттерін әр жолға бөлек жазыңыз...",
-    notes: "Ескертпелер",
-    notesPlaceholder: "Маңызды ескертпелерді, талаптарды немесе университет нұсқауларын қосыңыз...",
-    generateStructure: "Диплом құрылымын жасау",
-    saveProgress: "Прогресті сақтау",
-    clear: "Тазалау",
-    generatedStructure: "Жасалған диплом құрылымы",
-    sectionProgress: "Бөлімдер прогресі",
-    progressSaved: "Прогресс сәтті сақталды.",
-    structureReady: "Диплом құрылымы сәтті жасалды.",
-    required: "Диплом тақырыбын, негізгі мақсатты және зерттеу міндеттерін толтырыңыз.",
-    backToDashboard: "Панельге қайту",
-    frontendNoteTitle: "Frontend статусы",
-    frontendNote:
-      "Бұл бетте диплом workspace құру, тақырып, мақсат және міндеттерді қосу, диплом құрылымын preview ретінде жасау және бөлімдер прогресін бақылау үшін frontend UI бар. Нақты дерекқорға сақтау немесе AI генерация backend/API арқылы кейін қосылады.",
-    progress: "Прогресс",
-    complete: "дайын",
-    researchTypes: [
-      "Теориялық зерттеу",
-      "Практикалық зерттеу",
-      "Кейс-стади",
-      "Деректер талдауы",
-      "Жүйе жобалау",
-      "Салыстырмалы зерттеу",
-    ],
-    previewCards: [
-      {
-        title: "Диплом workspace",
-        text: "Тақырып, жетекші, дедлайн, мақсат және ескертпелерді бір жерде сақтаңыз.",
-      },
-      {
-        title: "Диплом құрылымы",
-        text: "Диплом жұмысының стандартты академиялық құрылымын жасаңыз.",
-      },
-      {
-        title: "Бөлімдер прогресі",
-        text: "Дипломның қай бөлімдері дайын екенін белгілеңіз.",
-      },
-    ],
-    sections: [
-      {
-        id: "introduction",
-        title: "Кіріспе",
-        description:
-          "Тақырыпты, мәселені, мотивацияны, мақсаттарды және зерттеу сұрақтарын таныстырыңыз.",
-        output:
-          "Тақырыптың маңызын, қандай мәселе шешілетінін және жұмыстың мақсатын түсіндіріңіз.",
-      },
-      {
-        id: "literature",
-        title: "Әдебиеттерге шолу",
-        description:
-          "Академиялық дереккөздерді, теорияларды, зерттеулерді және негізгі ұғымдарды жинақтаңыз.",
-        output:
-          "Бар зерттеулерді салыстырып, диплом жұмысы қарастыратын бос орынды көрсетіңіз.",
-      },
-      {
-        id: "methodology",
-        title: "Методология",
-        description:
-          "Зерттеу әдістерін, дереккөздерді, құралдарды және бағалау тәсілін сипаттаңыз.",
-        output:
-          "Зерттеу қалай жүргізілетінін және таңдалған әдістің неге сәйкес екенін түсіндіріңіз.",
-      },
-      {
-        id: "analysis",
-        title: "Талдау / нәтижелер",
-        description:
-          "Практикалық жұмысты, деректерді, есептеулерді, эксперименттерді немесе нәтижелерді көрсетіңіз.",
-        output:
-          "Негізгі нәтижелерді көрсетіп, оларды зерттеу міндеттерімен байланыстырыңыз.",
-      },
-      {
-        id: "discussion",
-        title: "Талқылау",
-        description:
-          "Нәтижелерді түсіндіріп, күтілген нәтижелермен салыстырып, шектеулерді көрсетіңіз.",
-        output:
-          "Нәтижелердің мағынасын және ескерілуі керек шектеулерді түсіндіріңіз.",
-      },
-      {
-        id: "conclusion",
-        title: "Қорытынды",
-        description:
-          "Жұмысты қорытындылап, зерттеу сұрақтарына жауап беріп, болашақ бағыттарды ұсыныңыз.",
-        output:
-          "Не орындалғанын және диплом мақсаты қалай жүзеге асқанын нақты көрсетіңіз.",
-      },
-      {
-        id: "references",
-        title: "Пайдаланылған әдебиеттер",
-        description:
-          "Барлық академиялық дереккөздерді, кітаптарды, мақалаларды, сайттарды және датасеттерді көрсетіңіз.",
-        output:
-          "Дереккөздерді қажетті citation style бойынша дайындаңыз.",
-      },
+    researchGoal: "Зерттеу мақсаты",
+    researchGoalPlaceholder: "Диплом жұмысының негізгі мақсатын сипаттаңыз...",
+    objectives: "Зерттеу міндеттері",
+    objectivesPlaceholder: "3–5 міндетті әр жолға бөлек жазыңыз...",
+    saveDraft: "Черновикті сақтау",
+    generateStructure: "Құрылым жасау",
+    structureTitle: "Жасалған диплом құрылымы",
+    structureSubtitle:
+      "Бұл frontend-preview. Кейін нақты AI құрылым генерациясы backend/API арқылы қосылады.",
+    chapterProgressTitle: "Тараулар прогресі",
+    chapterProgressSubtitle:
+      "Тарау статустарын жаңартып, жалпы диплом прогресін бақылаңыз.",
+    storedLocally: "Прогресс frontend-preview үшін локалды сақталады.",
+    status: "Статус",
+    chaptersCompleted: "тарау аяқталды",
+    progressHint: "Тексерілген тараулар негізінде.",
+    researchTypes: {
+      mixed: "Аралас әдістер",
+      quantitative: "Сандық зерттеу",
+      qualitative: "Сапалық зерттеу",
+      theoretical: "Теориялық зерттеу",
+    },
+    statuses: {
+      notStarted: "Басталмады",
+      inProgress: "Процесте",
+      draftReady: "Черновик дайын",
+      reviewed: "Тексерілді",
+    },
+    structure: {
+      introduction:
+        "Кіріспе: мәселені, зерттеу мақсатын, міндеттерді және өзектілікті анықтау.",
+      literature:
+        "Әдебиетке шолу: бар зерттеулерді қорытындылап, research gap табу.",
+      methodology:
+        "Әдістеме: дереккөздерді, әдістерді, құралдарды және шектеулерді түсіндіру.",
+      results:
+        "Нәтижелер / талдау: қорытындыларды кесте, график немесе мысалдармен көрсету.",
+      discussion:
+        "Талқылау: нәтижелерді зерттеу сұрақтарымен және әдебиетпен байланыстыру.",
+      conclusion:
+        "Қорытынды: жұмыстың үлесін жинақтап, болашақ зерттеу бағыттарын ұсыну.",
+    },
+    chapterTitles: {
+      introduction: "Кіріспе",
+      literature: "Әдебиетке шолу",
+      methodology: "Әдістеме",
+      results: "Нәтижелер / талдау",
+      discussion: "Талқылау",
+      conclusion: "Қорытынды",
+    },
+    tipsTitle: "Диплом бойынша кеңестер",
+    tipsSubtitle: "Жұмысты түсінікті ұстауға арналған қысқа ескертулер.",
+    tips: [
+      "Зерттеу сұрағын нақты және өлшенетін етіп жасаңыз.",
+      "Қорытынды нәтижелерге дейін әдістемені жазып қойыңыз.",
+      "Басынан бастап бір citation style қолданыңыз.",
+      "Әр кездесуден кейін жетекші пікірлерін сақтап отырыңыз.",
     ],
   },
 };
 
-export default function DiplomaPage() {
-  const { language } = useLanguage();
-  const text = pageText[language];
+const languageStorageKeys = [
+  "studyai-language",
+  "studyai_lang",
+  "language",
+  "locale",
+];
 
-  const [topic, setTopic] = useState("");
-  const [faculty, setFaculty] = useState("");
-  const [researchArea, setResearchArea] = useState("");
-  const [supervisor, setSupervisor] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [researchTypeIndex, setResearchTypeIndex] = useState(0);
-  const [goal, setGoal] = useState("");
-  const [tasks, setTasks] = useState("");
-  const [notes, setNotes] = useState("");
+const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
+const diplomaStorageKey = "studyai-diploma-form";
+const chapterStorageKey = "studyai-diploma-chapters";
 
-  const [progress, setProgress] = useState<Record<string, boolean>>(initialProgress);
-  const [generated, setGenerated] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+const chapterKeys: ChapterKey[] = [
+  "introduction",
+  "literature",
+  "methodology",
+  "results",
+  "discussion",
+  "conclusion",
+];
 
-  const researchType = text.researchTypes[researchTypeIndex] || text.researchTypes[0];
+function getStoredLanguage(): Language {
+  if (typeof window === "undefined") return "ru";
 
-  const progressPercent = useMemo(() => {
-    const completed = Object.values(progress).filter(Boolean).length;
-    const total = text.sections.length;
+  for (const key of languageStorageKeys) {
+    const value = window.localStorage.getItem(key);
 
-    if (total === 0) return 0;
+    if (value === "en" || value === "ru" || value === "kz") {
+      return value;
+    }
+  }
 
-    return Math.round((completed / total) * 100);
-  }, [progress, text.sections.length]);
+  return "ru";
+}
+
+function getStoredTheme(): Theme {
+  if (typeof window === "undefined") return "dark";
+
+  for (const key of themeStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "light" || value === "dark") {
+      return value;
+    }
+  }
+
+  return "dark";
+}
+
+function getProgress(chapters: Record<ChapterKey, ChapterStatus>) {
+  const reviewedCount = chapterKeys.filter(
+    (chapter) => chapters[chapter] === "reviewed"
+  ).length;
+
+  return Math.round((reviewedCount / chapterKeys.length) * 100);
+}
+
+function DiplomaContent() {
+  const [language, setLanguage] = useState<Language>("ru");
+  const [theme, setTheme] = useState<Theme>("dark");
+
+  const [form, setForm] = useState<DiplomaForm>({
+    topic: "",
+    faculty: "",
+    researchArea: "",
+    supervisor: "",
+    deadline: "",
+    researchType: "mixed",
+    researchGoal: "",
+    objectives: "",
+  });
+
+  const [chapters, setChapters] = useState<Record<ChapterKey, ChapterStatus>>({
+    introduction: "inProgress",
+    literature: "notStarted",
+    methodology: "notStarted",
+    results: "notStarted",
+    discussion: "notStarted",
+    conclusion: "notStarted",
+  });
+
+  const t = copy[language];
+  const isDark = theme === "dark";
+  const progress = useMemo(() => getProgress(chapters), [chapters]);
 
   useEffect(() => {
-    const savedProgress = localStorage.getItem("studyai_diploma_progress");
+    setLanguage(getStoredLanguage());
+    setTheme(getStoredTheme());
 
-    if (savedProgress) {
+    const savedForm = window.localStorage.getItem(diplomaStorageKey);
+    const savedChapters = window.localStorage.getItem(chapterStorageKey);
+
+    if (savedForm) {
       try {
-        const parsedProgress = JSON.parse(savedProgress);
-        setProgress({
-          ...initialProgress,
-          ...parsedProgress,
-        });
+        setForm(JSON.parse(savedForm) as DiplomaForm);
       } catch {
-        setProgress(initialProgress);
+        window.localStorage.removeItem(diplomaStorageKey);
       }
     }
-  }, []);
 
-  function handleGenerateStructure(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    setErrorMessage("");
-    setSuccessMessage("");
-
-    if (!topic.trim() || !goal.trim() || !tasks.trim()) {
-      setErrorMessage(text.required);
-      setGenerated(false);
-      return;
+    if (savedChapters) {
+      try {
+        setChapters(JSON.parse(savedChapters) as Record<ChapterKey, ChapterStatus>);
+      } catch {
+        window.localStorage.removeItem(chapterStorageKey);
+      }
     }
 
-    setGenerated(true);
-    setSuccessMessage(text.structureReady);
-  }
+    function handleLanguageChange(event: Event) {
+      const customEvent = event as CustomEvent<Language>;
 
-  function handleSaveProgress() {
-    localStorage.setItem("studyai_diploma_progress", JSON.stringify(progress));
+      if (
+        customEvent.detail === "en" ||
+        customEvent.detail === "ru" ||
+        customEvent.detail === "kz"
+      ) {
+        setLanguage(customEvent.detail);
+      }
+    }
 
-    setErrorMessage("");
-    setSuccessMessage(text.progressSaved);
-  }
+    function handleThemeChange(event: Event) {
+      const customEvent = event as CustomEvent<Theme>;
 
-  function handleClear() {
-    setTopic("");
-    setFaculty("");
-    setResearchArea("");
-    setSupervisor("");
-    setDeadline("");
-    setResearchTypeIndex(0);
-    setGoal("");
-    setTasks("");
-    setNotes("");
-    setProgress({ ...initialProgress });
-    setGenerated(false);
-    setErrorMessage("");
-    setSuccessMessage("");
-    localStorage.removeItem("studyai_diploma_progress");
-  }
+      if (customEvent.detail === "light" || customEvent.detail === "dark") {
+        setTheme(customEvent.detail);
+      }
+    }
 
-  function toggleSection(sectionId: string) {
-    setProgress((current) => ({
-      ...current,
-      [sectionId]: !current[sectionId],
+    function handleStorageChange() {
+      setLanguage(getStoredLanguage());
+      setTheme(getStoredTheme());
+    }
+
+    window.addEventListener("studyai:language-change", handleLanguageChange);
+    window.addEventListener("studyai:theme-change", handleThemeChange);
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener(
+        "studyai:language-change",
+        handleLanguageChange
+      );
+      window.removeEventListener("studyai:theme-change", handleThemeChange);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
+
+  function updateForm<K extends keyof DiplomaForm>(key: K, value: DiplomaForm[K]) {
+    setForm((previous) => ({
+      ...previous,
+      [key]: value,
     }));
   }
 
-  return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <AppSidebar />
+  function saveDiplomaDraft() {
+    window.localStorage.setItem(diplomaStorageKey, JSON.stringify(form));
+    window.localStorage.setItem(chapterStorageKey, JSON.stringify(chapters));
+  }
 
-      <section className="min-h-screen px-4 pb-8 pt-20 sm:px-6 lg:ml-[300px] lg:px-10 lg:py-10">
-        <div className="mx-auto w-full max-w-[1680px]">
-          <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">{text.title}</h1>
-              <p className="mt-2 text-slate-500">{text.subtitle}</p>
+  function updateChapterStatus(chapter: ChapterKey, status: ChapterStatus) {
+    const nextChapters = {
+      ...chapters,
+      [chapter]: status,
+    };
+
+    setChapters(nextChapters);
+    window.localStorage.setItem(chapterStorageKey, JSON.stringify(nextChapters));
+  }
+
+  const pageClass = isDark
+    ? "min-h-full bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8"
+    : "min-h-full bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8";
+
+  const cardClass = isDark
+    ? "border-white/10 bg-slate-900/70 shadow-sm"
+    : "border-slate-200 bg-white shadow-sm";
+
+  const softCardClass = isDark
+    ? "border-white/10 bg-slate-950/50"
+    : "border-slate-200 bg-slate-50";
+
+  const titleClass = isDark ? "text-white" : "text-slate-950";
+  const textClass = isDark ? "text-slate-300" : "text-slate-600";
+  const mutedClass = isDark ? "text-slate-400" : "text-slate-500";
+
+  const inputClass = isDark
+    ? "border-white/10 bg-slate-950/70 text-white placeholder:text-slate-500 focus:border-blue-400 focus:ring-blue-500/10"
+    : "border-slate-200 bg-white text-slate-950 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/10";
+
+  return (
+    <div className={pageClass}>
+      <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6">
+        <section
+          className={`overflow-hidden rounded-[2rem] border p-5 sm:p-6 lg:p-8 ${cardClass}`}
+        >
+          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
+            <div className="min-w-0">
+              <div
+                className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${
+                  isDark
+                    ? "border-blue-400/20 bg-blue-400/10 text-blue-200"
+                    : "border-blue-100 bg-blue-50 text-blue-700"
+                }`}
+              >
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                {t.pageBadge}
+              </div>
+
+              <h1
+                className={`max-w-4xl text-3xl font-black tracking-tight sm:text-4xl ${titleClass}`}
+              >
+                {t.pageTitle}
+              </h1>
+
+              <p
+                className={`mt-4 max-w-4xl text-sm leading-7 sm:text-base ${textClass}`}
+              >
+                {t.pageSubtitle}
+              </p>
             </div>
 
-            <Link
-              href="/dashboard"
-              className="w-fit rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            <div
+              className={`flex h-24 w-32 shrink-0 flex-col items-center justify-center rounded-3xl border ${
+                isDark
+                  ? "border-blue-400/20 bg-blue-500/15"
+                  : "border-blue-100 bg-blue-50"
+              }`}
             >
-              {text.backToDashboard}
-            </Link>
-          </header>
+              <span className={`text-xs font-black ${mutedClass}`}>
+                {t.overallProgress}
+              </span>
+              <span className="mt-1 text-4xl font-black text-blue-600">
+                {progress}%
+              </span>
+            </div>
+          </div>
+        </section>
 
-          <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_380px]">
-            <form
-              onSubmit={handleGenerateStructure}
-              className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
-            >
-              <div className="mb-8">
-                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-2xl font-bold text-blue-600">
-                  D
-                </div>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+          <section className={`rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
+            <div>
+              <h2 className={`text-xl font-black ${titleClass}`}>
+                {t.workspaceTitle}
+              </h2>
+              <p className={`mt-2 text-sm leading-6 ${textClass}`}>
+                {t.workspaceSubtitle}
+              </p>
+            </div>
 
-                <h2 className="text-2xl font-bold">{text.formTitle}</h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                  {text.formSubtitle}
-                </p>
+            <div className="mt-6 grid gap-5">
+              <label className="grid gap-2">
+                <span className={`text-sm font-black ${titleClass}`}>
+                  {t.topic}
+                </span>
+                <input
+                  value={form.topic}
+                  onChange={(event) => updateForm("topic", event.target.value)}
+                  placeholder={t.topicPlaceholder}
+                  className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+                />
+              </label>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className={`text-sm font-black ${titleClass}`}>
+                    {t.faculty}
+                  </span>
+                  <input
+                    value={form.faculty}
+                    onChange={(event) =>
+                      updateForm("faculty", event.target.value)
+                    }
+                    placeholder={t.facultyPlaceholder}
+                    className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+                  />
+                </label>
+
+                <label className="grid gap-2">
+                  <span className={`text-sm font-black ${titleClass}`}>
+                    {t.researchArea}
+                  </span>
+                  <input
+                    value={form.researchArea}
+                    onChange={(event) =>
+                      updateForm("researchArea", event.target.value)
+                    }
+                    placeholder={t.researchAreaPlaceholder}
+                    className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+                  />
+                </label>
               </div>
 
-              <section className="rounded-3xl bg-slate-50 p-5 sm:p-6">
-                <h3 className="mb-5 text-lg font-bold">{text.workspaceTitle}</h3>
-
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      {text.topic}
-                    </label>
-
-                    <input
-                      value={topic}
-                      onChange={(e) => setTopic(e.target.value)}
-                      placeholder={text.topicPlaceholder}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      {text.faculty}
-                    </label>
-
-                    <input
-                      value={faculty}
-                      onChange={(e) => setFaculty(e.target.value)}
-                      placeholder={text.facultyPlaceholder}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      {text.researchArea}
-                    </label>
-
-                    <input
-                      value={researchArea}
-                      onChange={(e) => setResearchArea(e.target.value)}
-                      placeholder={text.researchAreaPlaceholder}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      {text.supervisor}
-                    </label>
-
-                    <input
-                      value={supervisor}
-                      onChange={(e) => setSupervisor(e.target.value)}
-                      placeholder={text.supervisorPlaceholder}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      {text.deadline}
-                    </label>
-
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={deadline}
-                      onChange={(e) => setDeadline(e.target.value)}
-                      placeholder={text.deadlinePlaceholder}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-semibold text-slate-700">
-                      {text.researchType}
-                    </label>
-
-                    <select
-                      value={String(researchTypeIndex)}
-                      onChange={(e) => setResearchTypeIndex(Number(e.target.value))}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                    >
-                      {text.researchTypes.map((item, index) => (
-                        <option key={item} value={String(index)}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </section>
-
-              <section className="mt-8 grid grid-cols-1 gap-5">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.goal}
-                  </label>
-
-                  <textarea
-                    value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                    placeholder={text.goalPlaceholder}
-                    rows={4}
-                    className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:ring-2 focus:ring-blue-500"
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className={`text-sm font-black ${titleClass}`}>
+                    {t.supervisor}
+                  </span>
+                  <input
+                    value={form.supervisor}
+                    onChange={(event) =>
+                      updateForm("supervisor", event.target.value)
+                    }
+                    placeholder={t.supervisorPlaceholder}
+                    className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
                   />
-                </div>
+                </label>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.tasks}
-                  </label>
-
-                  <textarea
-                    value={tasks}
-                    onChange={(e) => setTasks(e.target.value)}
-                    placeholder={text.tasksPlaceholder}
-                    rows={5}
-                    className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:ring-2 focus:ring-blue-500"
+                <label className="grid gap-2">
+                  <span className={`text-sm font-black ${titleClass}`}>
+                    {t.deadline}
+                  </span>
+                  <input
+                    value={form.deadline}
+                    onChange={(event) =>
+                      updateForm("deadline", event.target.value)
+                    }
+                    placeholder={t.deadlinePlaceholder}
+                    className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
                   />
-                </div>
+                </label>
+              </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.notes}
-                  </label>
-
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder={text.notesPlaceholder}
-                    rows={4}
-                    className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </section>
-
-              {errorMessage && (
-                <div className="mt-6 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                  {errorMessage}
-                </div>
-              )}
-
-              {successMessage && (
-                <div className="mt-6 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-medium text-green-600">
-                  {successMessage}
-                </div>
-              )}
-
-              <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <button
-                  type="submit"
-                  className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+              <label className="grid gap-2">
+                <span className={`text-sm font-black ${titleClass}`}>
+                  {t.researchType}
+                </span>
+                <select
+                  value={form.researchType}
+                  onChange={(event) =>
+                    updateForm("researchType", event.target.value as ResearchType)
+                  }
+                  className={`h-12 rounded-2xl border px-4 text-sm font-semibold outline-none transition focus:ring-4 ${inputClass}`}
                 >
-                  {text.generateStructure}
+                  {(["mixed", "quantitative", "qualitative", "theoretical"] as ResearchType[]).map(
+                    (type) => (
+                      <option key={type} value={type}>
+                        {t.researchTypes[type]}
+                      </option>
+                    )
+                  )}
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className={`text-sm font-black ${titleClass}`}>
+                  {t.researchGoal}
+                </span>
+                <textarea
+                  value={form.researchGoal}
+                  onChange={(event) =>
+                    updateForm("researchGoal", event.target.value)
+                  }
+                  placeholder={t.researchGoalPlaceholder}
+                  rows={4}
+                  className={`resize-none rounded-2xl border px-4 py-3 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+                />
+              </label>
+
+              <label className="grid gap-2">
+                <span className={`text-sm font-black ${titleClass}`}>
+                  {t.objectives}
+                </span>
+                <textarea
+                  value={form.objectives}
+                  onChange={(event) =>
+                    updateForm("objectives", event.target.value)
+                  }
+                  placeholder={t.objectivesPlaceholder}
+                  rows={4}
+                  className={`resize-none rounded-2xl border px-4 py-3 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+                />
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={saveDiplomaDraft}
+                  className={`h-12 rounded-2xl border text-sm font-black transition ${
+                    isDark
+                      ? "border-white/10 bg-slate-950/60 text-slate-100 hover:bg-white/10"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {t.saveDraft}
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleSaveProgress}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  onClick={saveDiplomaDraft}
+                  className="h-12 rounded-2xl bg-blue-600 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700"
                 >
-                  {text.saveProgress}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-500 transition hover:bg-slate-50"
-                >
-                  {text.clear}
+                  {t.generateStructure}
                 </button>
               </div>
+            </div>
+          </section>
 
-              {generated && (
-                <section className="mt-8 rounded-3xl border border-blue-100 bg-blue-50 p-6">
-                  <div className="mb-6">
-                    <p className="text-sm font-semibold text-blue-600">
-                      {text.generatedStructure}
-                    </p>
+          <aside className="grid gap-6">
+            <section className={`rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
+              <h2 className={`text-xl font-black ${titleClass}`}>
+                {t.structureTitle}
+              </h2>
 
-                    <h3 className="mt-1 text-xl font-bold text-slate-900">
-                      {topic}
-                    </h3>
+              <p className={`mt-2 text-sm leading-6 ${textClass}`}>
+                {t.structureSubtitle}
+              </p>
 
-                    <p className="mt-2 text-sm text-slate-600">
-                      {researchType}
-                      {deadline ? ` · ${deadline}` : ""}
-                    </p>
-                  </div>
+              <div className="mt-6 grid gap-3">
+                {chapterKeys.map((chapter, index) => (
+                  <div
+                    key={chapter}
+                    className={`flex gap-4 rounded-2xl border p-4 ${softCardClass}`}
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white">
+                      {index + 1}
+                    </span>
 
-                  <div className="space-y-4">
-                    {text.sections.map((section, index) => (
-                      <div
-                        key={section.id}
-                        className="rounded-2xl border border-blue-100 bg-white p-5"
-                      >
-                        <div className="flex gap-4">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                            {index + 1}
-                          </span>
-
-                          <div>
-                            <h4 className="font-bold">{section.title}</h4>
-                            <p className="mt-2 text-sm leading-6 text-slate-600">
-                              {section.description}
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-slate-500">
-                              {section.output}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-6">
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="text-xl font-bold">{text.sectionProgress}</h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {text.progress}: {progressPercent}% {text.complete}
+                    <p className={`text-sm font-semibold leading-6 ${textClass}`}>
+                      {t.structure[chapter]}
                     </p>
                   </div>
+                ))}
+              </div>
+            </section>
 
-                  <div className="h-3 w-full rounded-full bg-slate-100 sm:w-48">
-                    <div
-                      className="h-3 rounded-full bg-blue-600 transition-all"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
+            <section className={`rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className={`text-xl font-black ${titleClass}`}>
+                    {t.chapterProgressTitle}
+                  </h2>
+
+                  <p className={`mt-2 text-sm leading-6 ${textClass}`}>
+                    {t.chapterProgressSubtitle}
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {text.sections.map((section) => (
-                    <label
-                      key={section.id}
-                      className={
-                        progress[section.id]
-                          ? "flex cursor-pointer gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4"
-                          : "flex cursor-pointer gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                      }
-                    >
-                      <input
-                        type="checkbox"
-                        checked={Boolean(progress[section.id])}
-                        onChange={() => toggleSection(section.id)}
-                        className="mt-1 h-4 w-4"
-                      />
+                <div
+                  className={`rounded-2xl border px-4 py-3 text-center ${
+                    isDark
+                      ? "border-blue-400/20 bg-blue-500/15"
+                      : "border-blue-100 bg-blue-50"
+                  }`}
+                >
+                  <p className={`text-xs font-black ${mutedClass}`}>
+                    {t.overallProgress}
+                  </p>
+                  <p className="text-2xl font-black text-blue-600">
+                    {progress}%
+                  </p>
+                </div>
+              </div>
 
+              <div
+                className={`mt-5 h-3 overflow-hidden rounded-full ${
+                  isDark ? "bg-slate-950" : "bg-slate-200"
+                }`}
+              >
+                <div
+                  className="h-full rounded-full bg-blue-600"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              <p className={`mt-2 text-xs font-semibold ${mutedClass}`}>
+                {t.progressHint}
+              </p>
+
+              <div className="mt-6 grid gap-3">
+                {chapterKeys.map((chapter) => (
+                  <div
+                    key={chapter}
+                    className={`rounded-2xl border p-4 ${softCardClass}`}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="font-bold">{section.title}</p>
-                        <p className="mt-1 text-sm leading-6 text-slate-500">
-                          {section.description}
+                        <p className={`text-sm font-black ${titleClass}`}>
+                          {t.chapterTitles[chapter]}
+                        </p>
+                        <p className={`mt-1 text-xs font-semibold ${mutedClass}`}>
+                          {t.status}: {t.statuses[chapters[chapter]]}
                         </p>
                       </div>
-                    </label>
-                  ))}
-                </div>
-              </section>
-            </form>
 
-            <aside className="space-y-6">
-              <div className="rounded-3xl border border-blue-100 bg-blue-50 p-6 shadow-sm">
-                <h2 className="text-xl font-bold text-blue-600">
-                  {text.frontendNoteTitle}
-                </h2>
-
-                <p className="mt-4 text-sm leading-7 text-blue-700">
-                  {text.frontendNote}
-                </p>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="space-y-4">
-                  {text.previewCards.map((card) => (
-                    <div key={card.title} className="rounded-2xl bg-slate-50 p-5">
-                      <h3 className="font-bold">{card.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        {card.text}
-                      </p>
+                      <select
+                        value={chapters[chapter]}
+                        onChange={(event) =>
+                          updateChapterStatus(
+                            chapter,
+                            event.target.value as ChapterStatus
+                          )
+                        }
+                        className={`h-10 rounded-2xl border px-3 text-xs font-black outline-none ${inputClass}`}
+                      >
+                        {(
+                          [
+                            "notStarted",
+                            "inProgress",
+                            "draftReady",
+                            "reviewed",
+                          ] as ChapterStatus[]
+                        ).map((status) => (
+                          <option key={status} value={status}>
+                            {t.statuses[status]}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            </aside>
-          </div>
+
+              <p className={`mt-4 text-xs font-semibold ${mutedClass}`}>
+                {chapterKeys.filter((chapter) => chapters[chapter] === "reviewed").length}/
+                {chapterKeys.length} {t.chaptersCompleted}. {t.storedLocally}
+              </p>
+            </section>
+
+            <section className="rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-600 p-6 text-white shadow-sm shadow-blue-600/20">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-xl">
+                🎓
+              </div>
+
+              <h2 className="mt-5 text-xl font-black">{t.tipsTitle}</h2>
+
+              <p className="mt-2 text-sm font-medium leading-6 text-blue-100">
+                {t.tipsSubtitle}
+              </p>
+
+              <div className="mt-5 grid gap-3">
+                {t.tips.map((tip) => (
+                  <div
+                    key={tip}
+                    className="rounded-2xl border border-white/15 bg-white/10 p-4 text-sm font-semibold leading-6 text-white"
+                  >
+                    {tip}
+                  </div>
+                ))}
+              </div>
+            </section>
+          </aside>
         </div>
-      </section>
-    </main>
+      </div>
+    </div>
+  );
+}
+
+export default function DiplomaPage() {
+  return (
+    <AppShell>
+      <DiplomaContent />
+    </AppShell>
   );
 }

@@ -1,29 +1,288 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html {
+  scroll-behavior: smooth;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 34rem),
+    radial-gradient(circle at top right, rgba(99, 102, 241, 0.08), transparent 32rem),
+    var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-noto-sans), Arial, Helvetica, sans-serif;
 }
-html {
-  font-size: clamp(12.8px, calc(10px + 0.35vw), 17.6px);
+
+button,
+a,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.18);
+  color: #1e3a8a;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #020617;
+  --foreground: #e5e7eb;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.22), transparent 34rem),
+    radial-gradient(circle at top right, rgba(79, 70, 229, 0.18), transparent 32rem),
+    #020617;
+  color: #e5e7eb;
+}
+
+.dark ::selection {
+  background: rgba(59, 130, 246, 0.35);
+  color: #dbeafe;
+}
+
+/* Main backgrounds */
+.dark .bg-slate-50 {
+  background-color: #020617 !important;
+}
+
+.dark .bg-white,
+.dark .bg-white\/90,
+.dark .bg-white\/95,
+.dark .bg-white\/85 {
+  background-color: rgba(15, 23, 42, 0.92) !important;
+}
+
+.dark .bg-slate-100,
+.dark .bg-slate-200 {
+  background-color: #1e293b !important;
+}
+
+.dark .bg-blue-50,
+.dark .bg-blue-50\/60,
+.dark .bg-blue-50\/70 {
+  background-color: rgba(30, 64, 175, 0.18) !important;
+}
+
+.dark .bg-blue-100,
+.dark .bg-blue-100\/70 {
+  background-color: rgba(30, 64, 175, 0.24) !important;
+}
+
+.dark .bg-indigo-100,
+.dark .bg-indigo-100\/70 {
+  background-color: rgba(67, 56, 202, 0.22) !important;
+}
+
+.dark .bg-emerald-50,
+.dark .bg-emerald-50\/60,
+.dark .bg-emerald-50\/70 {
+  background-color: rgba(5, 150, 105, 0.16) !important;
+}
+
+.dark .bg-orange-50,
+.dark .bg-orange-50\/60,
+.dark .bg-orange-50\/70 {
+  background-color: rgba(234, 88, 12, 0.16) !important;
+}
+
+.dark .bg-purple-50,
+.dark .bg-purple-50\/60,
+.dark .bg-purple-50\/70 {
+  background-color: rgba(126, 34, 206, 0.16) !important;
+}
+
+.dark .bg-red-50,
+.dark .bg-red-50\/60,
+.dark .bg-red-50\/70 {
+  background-color: rgba(220, 38, 38, 0.16) !important;
+}
+
+/* Dark mode gradient fixes */
+.dark .from-white {
+  --tw-gradient-from: rgba(15, 23, 42, 0.96) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(15, 23, 42, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.dark .from-slate-50 {
+  --tw-gradient-from: #020617 var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(2, 6, 23, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.dark .from-blue-50 {
+  --tw-gradient-from: rgba(30, 64, 175, 0.2) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(30, 64, 175, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.dark .to-white {
+  --tw-gradient-to: rgba(15, 23, 42, 0.92) var(--tw-gradient-to-position) !important;
+}
+
+.dark .to-slate-50 {
+  --tw-gradient-to: #020617 var(--tw-gradient-to-position) !important;
+}
+
+.dark .to-blue-50 {
+  --tw-gradient-to: rgba(30, 64, 175, 0.18) var(--tw-gradient-to-position) !important;
+}
+
+.dark .via-white {
+  --tw-gradient-via: rgba(15, 23, 42, 0.92) var(--tw-gradient-via-position) !important;
+  --tw-gradient-to: rgba(15, 23, 42, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+}
+
+.dark .via-slate-50 {
+  --tw-gradient-via: #020617 var(--tw-gradient-via-position) !important;
+  --tw-gradient-to: rgba(2, 6, 23, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+}
+
+/* Text */
+.dark .text-slate-950,
+.dark .text-slate-900,
+.dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.dark .text-slate-400 {
+  color: #64748b !important;
+}
+
+.dark .text-blue-700,
+.dark .text-blue-600 {
+  color: #93c5fd !important;
+}
+
+.dark .text-emerald-700 {
+  color: #6ee7b7 !important;
+}
+
+.dark .text-orange-700 {
+  color: #fdba74 !important;
+}
+
+.dark .text-purple-700 {
+  color: #d8b4fe !important;
+}
+
+.dark .text-red-700,
+.dark .text-red-600 {
+  color: #fca5a5 !important;
+}
+
+/* Borders */
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-blue-100,
+.dark .border-blue-200,
+.dark .border-emerald-100,
+.dark .border-orange-100,
+.dark .border-purple-100,
+.dark .border-red-100 {
+  border-color: rgba(71, 85, 105, 0.65) !important;
+}
+
+/* Shadows */
+.dark .shadow-sm,
+.dark .shadow-xl,
+.dark .shadow-blue-100\/50,
+.dark .shadow-blue-100,
+.dark .shadow-slate-200\/70,
+.dark .shadow-slate-200\/80 {
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* Forms */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: rgba(15, 23, 42, 0.88) !important;
+  border-color: rgba(71, 85, 105, 0.65) !important;
+  color: #f8fafc !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+.dark select option {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+/* Focus states */
+.dark .focus\:bg-white:focus {
+  background-color: #0f172a !important;
+}
+
+.dark .focus\:border-blue-300:focus {
+  border-color: #60a5fa !important;
+}
+
+.dark .focus\:ring-blue-100:focus {
+  --tw-ring-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+/* Hover states */
+.dark .hover\:bg-slate-50:hover {
+  background-color: rgba(30, 41, 59, 0.75) !important;
+}
+
+.dark .hover\:bg-blue-50:hover {
+  background-color: rgba(30, 64, 175, 0.24) !important;
+}
+
+.dark .hover\:bg-blue-100:hover {
+  background-color: rgba(30, 64, 175, 0.32) !important;
+}
+
+.dark .hover\:text-slate-950:hover {
+  color: #f8fafc !important;
+}
+
+.dark .hover\:text-blue-700:hover {
+  color: #bfdbfe !important;
+}
+
+.dark .hover\:border-blue-200:hover {
+  border-color: rgba(96, 165, 250, 0.65) !important;
+}
+
+.dark .backdrop-blur-xl {
+  backdrop-filter: blur(20px);
+}
+
+.dark .shadow-\[0_-12px_35px_rgba\(15\,23\,42\,0\.08\)\] {
+  box-shadow: 0 -12px 35px rgba(0, 0, 0, 0.32) !important;
 }

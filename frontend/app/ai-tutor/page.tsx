@@ -1,140 +1,710 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import AppSidebar from "@/components/AppSidebar";
-import { useLanguage } from "@/components/LanguageProvider";
-import { supabase } from "@/lib/supabase";
-import {
-  Conversation,
-  createConversation,
-  getConversations,
-} from "@/lib/aiTutor";
+import { useEffect, useMemo, useState } from "react";
+import AppShell from "@/components/AppShell";
 
-export default function AiTutorPage() {
-  const router = useRouter();
-  const { t } = useLanguage();
+type Language = "en" | "ru" | "kz";
+type Theme = "light" | "dark";
 
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [userId, setUserId] = useState("");
+type TutorCopy = {
+  chatTitle: string;
+  chatSubtitle: string;
+  clearChat: string;
+  emptyTitle: string;
+  emptySubtitle: string;
+  userMessage: string;
+  assistantMessage: string;
+  inputPlaceholder: string;
+  send: string;
+  attach: string;
+  quickTips: string;
+  beta: string;
+  recentChats: string;
+  viewAll: string;
+  today: string;
+  onlineTitle: string;
+  onlineSubtitle: string;
+  cards: {
+    explain: {
+      title: string;
+      subtitle: string;
+    };
+    step: {
+      title: string;
+      subtitle: string;
+    };
+    exam: {
+      title: string;
+      subtitle: string;
+    };
+    practice: {
+      title: string;
+      subtitle: string;
+    };
+  };
+  tips: {
+    specific: {
+      title: string;
+      subtitle: string;
+    };
+    step: {
+      title: string;
+      subtitle: string;
+    };
+    examples: {
+      title: string;
+      subtitle: string;
+    };
+    practice: {
+      title: string;
+      subtitle: string;
+    };
+  };
+  recent: {
+    pythagorean: string;
+    photosynthesis: string;
+    newton: string;
+    quadratic: string;
+    cell: string;
+  };
+};
+
+const copy: Record<Language, TutorCopy> = {
+  en: {
+    chatTitle: "AI Tutor Chat",
+    chatSubtitle:
+      "Ask about any subject, assignment, exam topic, or uploaded study material.",
+    clearChat: "Clear chat",
+    emptyTitle: "Start learning with AI Tutor",
+    emptySubtitle:
+      "Ask about any subject, assignment, exam topic, or uploaded study material.",
+    userMessage: "Can you explain the Pythagorean theorem and how it is used?",
+    assistantMessage:
+      "Absolutely. The Pythagorean theorem is used in right triangles. It says that the square of the hypotenuse equals the sum of the squares of the other two sides: a² + b² = c². It helps you find a missing side when you know the other two.",
+    inputPlaceholder:
+      "Ask me anything... e.g. explain photosynthesis, help with calculus, summarize this topic...",
+    send: "Send",
+    attach: "Attach",
+    quickTips: "Quick tips",
+    beta: "Beta",
+    recentChats: "Recent chats",
+    viewAll: "View all",
+    today: "Today",
+    onlineTitle: "AI Tutor is online",
+    onlineSubtitle:
+      "Ready to help with explanations, exam prep, summaries, and practice questions.",
+    cards: {
+      explain: {
+        title: "Explain a topic",
+        subtitle: "Get simple explanations with examples.",
+      },
+      step: {
+        title: "Step by step",
+        subtitle: "Break down difficult problems.",
+      },
+      exam: {
+        title: "Prepare for exam",
+        subtitle: "Create a quick revision plan.",
+      },
+      practice: {
+        title: "Create practice questions",
+        subtitle: "Generate questions to test yourself.",
+      },
+    },
+    tips: {
+      specific: {
+        title: "Be specific",
+        subtitle: "Ask clear and detailed questions.",
+      },
+      step: {
+        title: "Ask step by step",
+        subtitle: "Request explanations in smaller parts.",
+      },
+      examples: {
+        title: "Use examples",
+        subtitle: "Ask for real-world examples.",
+      },
+      practice: {
+        title: "Practice more",
+        subtitle: "Turn explanations into quizzes.",
+      },
+    },
+    recent: {
+      pythagorean: "Pythagorean theorem explanation",
+      photosynthesis: "Photosynthesis process",
+      newton: "Newton’s laws of motion",
+      quadratic: "Quadratic equation problems",
+      cell: "Cell structure and function",
+    },
+  },
+  ru: {
+    chatTitle: "Чат с AI Tutor",
+    chatSubtitle:
+      "Задай вопрос по предмету, заданию, теме экзамена или загруженному учебному материалу.",
+    clearChat: "Очистить чат",
+    emptyTitle: "Начни учиться с AI Tutor",
+    emptySubtitle:
+      "Задай вопрос по предмету, заданию, теме экзамена или загруженному учебному материалу.",
+    userMessage:
+      "Можешь объяснить теорему Пифагора и как она используется?",
+    assistantMessage:
+      "Конечно. Теорема Пифагора используется в прямоугольных треугольниках. Она говорит, что квадрат гипотенузы равен сумме квадратов двух других сторон: a² + b² = c². С её помощью можно найти неизвестную сторону, если известны две другие.",
+    inputPlaceholder:
+      "Спроси что угодно... например: объясни фотосинтез, помоги с математикой, кратко перескажи тему...",
+    send: "Отправить",
+    attach: "Прикрепить",
+    quickTips: "Быстрые советы",
+    beta: "Бета",
+    recentChats: "Недавние чаты",
+    viewAll: "Смотреть все",
+    today: "Сегодня",
+    onlineTitle: "AI Tutor онлайн",
+    onlineSubtitle:
+      "Готов помочь с объяснениями, подготовкой к экзаменам, конспектами и практическими вопросами.",
+    cards: {
+      explain: {
+        title: "Объяснить тему",
+        subtitle: "Простые объяснения с примерами.",
+      },
+      step: {
+        title: "Пошаговое решение",
+        subtitle: "Разбор сложных задач по частям.",
+      },
+      exam: {
+        title: "Подготовка к экзамену",
+        subtitle: "Быстрый план повторения.",
+      },
+      practice: {
+        title: "Создать вопросы",
+        subtitle: "Практические вопросы для проверки себя.",
+      },
+    },
+    tips: {
+      specific: {
+        title: "Пиши конкретно",
+        subtitle: "Задавай понятные и подробные вопросы.",
+      },
+      step: {
+        title: "Проси по шагам",
+        subtitle: "Разбивай объяснение на маленькие части.",
+      },
+      examples: {
+        title: "Используй примеры",
+        subtitle: "Проси примеры из реальной жизни.",
+      },
+      practice: {
+        title: "Больше практики",
+        subtitle: "Превращай объяснения в мини-тесты.",
+      },
+    },
+    recent: {
+      pythagorean: "Объяснение теоремы Пифагора",
+      photosynthesis: "Процесс фотосинтеза",
+      newton: "Законы движения Ньютона",
+      quadratic: "Задачи с квадратными уравнениями",
+      cell: "Строение и функции клетки",
+    },
+  },
+  kz: {
+    chatTitle: "AI Tutor чаты",
+    chatSubtitle:
+      "Пән, тапсырма, емтихан тақырыбы немесе жүктелген оқу материалы бойынша сұрақ қойыңыз.",
+    clearChat: "Чатты тазарту",
+    emptyTitle: "AI Tutor арқылы оқуды бастаңыз",
+    emptySubtitle:
+      "Пән, тапсырма, емтихан тақырыбы немесе жүктелген оқу материалы бойынша сұрақ қойыңыз.",
+    userMessage:
+      "Пифагор теоремасын және оның қалай қолданылатынын түсіндіре аласың ба?",
+    assistantMessage:
+      "Әрине. Пифагор теоремасы тікбұрышты үшбұрыштарда қолданылады. Ол гипотенузаның квадраты қалған екі қабырғаның квадраттарының қосындысына тең екенін айтады: a² + b² = c². Бұл екі қабырға белгілі болғанда белгісіз қабырғаны табуға көмектеседі.",
+    inputPlaceholder:
+      "Кез келген сұрақ қойыңыз... мысалы: фотосинтезді түсіндір, математикадан көмектес, тақырыпты қысқаша қорытындыла...",
+    send: "Жіберу",
+    attach: "Тіркеу",
+    quickTips: "Жылдам кеңестер",
+    beta: "Бета",
+    recentChats: "Соңғы чаттар",
+    viewAll: "Барлығын көру",
+    today: "Бүгін",
+    onlineTitle: "AI Tutor онлайн",
+    onlineSubtitle:
+      "Түсіндіру, емтиханға дайындық, қысқаша конспект және практикалық сұрақтар бойынша көмектесуге дайын.",
+    cards: {
+      explain: {
+        title: "Тақырыпты түсіндіру",
+        subtitle: "Мысалдармен қарапайым түсіндіру.",
+      },
+      step: {
+        title: "Қадам бойынша",
+        subtitle: "Күрделі есептерді бөліп түсіндіру.",
+      },
+      exam: {
+        title: "Емтиханға дайындық",
+        subtitle: "Жылдам қайталау жоспары.",
+      },
+      practice: {
+        title: "Сұрақтар жасау",
+        subtitle: "Өзіңізді тексеруге арналған сұрақтар.",
+      },
+    },
+    tips: {
+      specific: {
+        title: "Нақты жазыңыз",
+        subtitle: "Сұрақты түсінікті және толық қойыңыз.",
+      },
+      step: {
+        title: "Қадаммен сұраңыз",
+        subtitle: "Түсіндіруді кіші бөліктерге бөліңіз.",
+      },
+      examples: {
+        title: "Мысал қолданыңыз",
+        subtitle: "Шынайы өмірден мысал сұраңыз.",
+      },
+      practice: {
+        title: "Көбірек практика",
+        subtitle: "Түсіндірмелерді тестке айналдырыңыз.",
+      },
+    },
+    recent: {
+      pythagorean: "Пифагор теоремасын түсіндіру",
+      photosynthesis: "Фотосинтез процесі",
+      newton: "Ньютонның қозғалыс заңдары",
+      quadratic: "Квадрат теңдеу есептері",
+      cell: "Жасушаның құрылысы мен қызметі",
+    },
+  },
+};
+
+const languageStorageKeys = [
+  "studyai-language",
+  "studyai_lang",
+  "language",
+  "locale",
+];
+
+const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
+
+const localeMap: Record<Language, string> = {
+  en: "en-US",
+  ru: "ru-RU",
+  kz: "kk-KZ",
+};
+
+const promptCards = [
+  {
+    key: "explain",
+    icon: "💡",
+  },
+  {
+    key: "step",
+    icon: "🧩",
+  },
+  {
+    key: "exam",
+    icon: "🎯",
+  },
+  {
+    key: "practice",
+    icon: "📝",
+  },
+] as const;
+
+const tips = [
+  {
+    key: "specific",
+    icon: "✍️",
+  },
+  {
+    key: "step",
+    icon: "🧠",
+  },
+  {
+    key: "examples",
+    icon: "🔍",
+  },
+  {
+    key: "practice",
+    icon: "✅",
+  },
+] as const;
+
+const recentChats = [
+  {
+    key: "pythagorean",
+    date: "today",
+  },
+  {
+    key: "photosynthesis",
+    date: new Date("2026-05-11T12:00:00"),
+  },
+  {
+    key: "newton",
+    date: new Date("2026-05-10T12:00:00"),
+  },
+  {
+    key: "quadratic",
+    date: new Date("2026-05-09T12:00:00"),
+  },
+  {
+    key: "cell",
+    date: new Date("2026-05-08T12:00:00"),
+  },
+] as const;
+
+function getStoredLanguage(): Language {
+  if (typeof window === "undefined") return "ru";
+
+  for (const key of languageStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "en" || value === "ru" || value === "kz") {
+      return value;
+    }
+  }
+
+  return "ru";
+}
+
+function getStoredTheme(): Theme {
+  if (typeof window === "undefined") return "dark";
+
+  for (const key of themeStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "light" || value === "dark") {
+      return value;
+    }
+  }
+
+  return "dark";
+}
+
+function formatDate(date: Date | "today", language: Language, todayLabel: string) {
+  if (date === "today") return todayLabel;
+
+  return new Intl.DateTimeFormat(localeMap[language], {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function TutorContent() {
+  const [language, setLanguage] = useState<Language>("ru");
+  const [theme, setTheme] = useState<Theme>("dark");
+
+  const t = copy[language];
+  const isDark = theme === "dark";
 
   useEffect(() => {
-    async function loadConversations() {
-      const { data: sessionData } = await supabase.auth.getSession();
+    setLanguage(getStoredLanguage());
+    setTheme(getStoredTheme());
 
-      if (!sessionData.session) {
-        router.push("/login");
-        return;
+    function handleLanguageChange(event: Event) {
+      const customEvent = event as CustomEvent<Language>;
+
+      if (
+        customEvent.detail === "en" ||
+        customEvent.detail === "ru" ||
+        customEvent.detail === "kz"
+      ) {
+        setLanguage(customEvent.detail);
       }
-
-      setUserId(sessionData.session.user.id);
-
-      const { data } = await getConversations();
-
-      setConversations((data || []) as Conversation[]);
-      setLoading(false);
     }
 
-    loadConversations();
-  }, [router]);
+    function handleThemeChange(event: Event) {
+      const customEvent = event as CustomEvent<Theme>;
 
-  async function handleNewChat() {
-    if (!userId) return;
-
-    setCreating(true);
-
-    const { data } = await createConversation(userId, t.aiTutorPage.newChat);
-
-    if (data) {
-      router.push(`/ai-tutor/${data.id}`);
-      return;
+      if (customEvent.detail === "light" || customEvent.detail === "dark") {
+        setTheme(customEvent.detail);
+      }
     }
 
-    setCreating(false);
-  }
+    function handleStorageChange() {
+      setLanguage(getStoredLanguage());
+      setTheme(getStoredTheme());
+    }
 
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-50 text-slate-900">
-        <AppSidebar />
+    window.addEventListener("studyai:language-change", handleLanguageChange);
+    window.addEventListener("studyai:theme-change", handleThemeChange);
+    window.addEventListener("storage", handleStorageChange);
 
-        <section className="min-h-screen px-4 pt-20 lg:ml-[300px] lg:flex lg:items-center lg:justify-center lg:pt-0">
-          <div className="rounded-2xl border border-slate-200 bg-white px-8 py-6 shadow-sm">
-            <p className="text-sm font-medium text-slate-600">
-              {t.aiTutorPage.loadingChats}
-            </p>
-          </div>
-        </section>
-      </main>
-    );
-  }
+    return () => {
+      window.removeEventListener(
+        "studyai:language-change",
+        handleLanguageChange
+      );
+      window.removeEventListener("studyai:theme-change", handleThemeChange);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
+
+  const pageClass = isDark
+    ? "min-h-full bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8"
+    : "min-h-full bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8";
+
+  const cardClass = isDark
+    ? "border-white/10 bg-slate-900/70 shadow-sm"
+    : "border-slate-200 bg-white shadow-sm";
+
+  const softCardClass = isDark
+    ? "border-white/10 bg-slate-950/50"
+    : "border-slate-200 bg-slate-50";
+
+  const titleClass = isDark ? "text-white" : "text-slate-950";
+  const textClass = isDark ? "text-slate-300" : "text-slate-600";
+  const mutedClass = isDark ? "text-slate-400" : "text-slate-500";
+  const inputClass = isDark
+    ? "border-white/10 bg-slate-950/70 text-white placeholder:text-slate-500 focus:border-blue-400 focus:ring-blue-500/10"
+    : "border-slate-200 bg-white text-slate-950 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/10";
+
+  const recentList = useMemo(
+    () =>
+      recentChats.map((chat) => ({
+        ...chat,
+        formattedDate: formatDate(chat.date, language, t.today),
+      })),
+    [language, t.today]
+  );
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <AppSidebar />
-
-      <section className="min-h-screen px-4 pb-8 pt-20 sm:px-6 lg:ml-[300px] lg:px-10 lg:py-10">
-        <div className="mx-auto w-full max-w-[1680px]">
-          <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">{t.aiTutorPage.title}</h1>
-              <p className="mt-2 text-slate-500">{t.aiTutorPage.subtitle}</p>
+    <div className={pageClass}>
+      <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section
+          className={`min-w-0 overflow-hidden rounded-[2rem] border ${cardClass}`}
+        >
+          <div className="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+            <div className="min-w-0">
+              <h1 className={`text-2xl font-black ${titleClass}`}>
+                {t.chatTitle}
+              </h1>
+              <p className={`mt-1 text-sm leading-6 ${mutedClass}`}>
+                {t.chatSubtitle}
+              </p>
             </div>
 
             <button
-              onClick={handleNewChat}
-              disabled={creating}
-              className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+              type="button"
+              className={`inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border px-4 text-sm font-black transition ${
+                isDark
+                  ? "border-white/10 bg-slate-950/60 text-slate-200 hover:border-blue-400/30 hover:bg-blue-400/10"
+                  : "border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-200 hover:bg-blue-50"
+              }`}
             >
-              {creating ? t.common.loading : t.aiTutorPage.newChat}
+              {t.clearChat}
             </button>
-          </header>
+          </div>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-            <h2 className="text-xl font-bold">{t.aiTutorPage.savedChats}</h2>
-
-            {conversations.length > 0 ? (
-              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {conversations.map((conversation) => (
-                  <button
-                    key={conversation.id}
-                    onClick={() => router.push(`/ai-tutor/${conversation.id}`)}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-left transition hover:border-blue-200 hover:bg-blue-50"
-                  >
-                    <p className="font-bold text-slate-900">
-                      {conversation.title || t.aiTutorPage.newChat}
-                    </p>
-
-                    <p className="mt-2 text-sm text-slate-500">
-                      {new Date(conversation.updated_at).toLocaleDateString()}
-                    </p>
-                  </button>
-                ))}
+          <div className="p-5 sm:p-6 lg:p-8">
+            <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+              <div
+                className={`flex h-16 w-16 items-center justify-center rounded-3xl text-2xl ${
+                  isDark ? "bg-blue-500/15" : "bg-blue-600/10"
+                }`}
+              >
+                🎓
               </div>
-            ) : (
-              <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center">
-                <p className="font-semibold text-slate-700">
-                  {t.aiTutorPage.noChats}
-                </p>
 
-                <p className="mt-2 text-sm text-slate-500">
-                  {t.aiTutorPage.noChatsSubtitle}
+              <h2 className={`mt-5 text-3xl font-black ${titleClass}`}>
+                {t.emptyTitle}
+              </h2>
+
+              <p className={`mt-3 max-w-2xl text-sm leading-6 ${mutedClass}`}>
+                {t.emptySubtitle}
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {promptCards.map((card) => (
+                <button
+                  key={card.key}
+                  type="button"
+                  className={`min-w-0 rounded-3xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${
+                    isDark
+                      ? "border-white/10 bg-slate-950/40 hover:border-blue-400/40 hover:bg-blue-400/10"
+                      : "border-slate-200 bg-slate-50 hover:border-blue-200 hover:bg-blue-50"
+                  }`}
+                >
+                  <div
+                    className={`flex h-11 w-11 items-center justify-center rounded-2xl text-xl ${
+                      isDark ? "bg-blue-500/15" : "bg-blue-600/10"
+                    }`}
+                  >
+                    {card.icon}
+                  </div>
+
+                  <p className={`mt-5 text-sm font-black ${titleClass}`}>
+                    {t.cards[card.key].title}
+                  </p>
+
+                  <p className={`mt-2 text-xs font-semibold leading-5 ${mutedClass}`}>
+                    {t.cards[card.key].subtitle}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 p-5 dark:border-white/10 sm:p-6">
+            <div className="flex justify-end">
+              <div className="max-w-[560px] rounded-[1.5rem] bg-blue-600 px-5 py-4 text-white shadow-sm shadow-blue-600/20">
+                <p className="text-sm font-semibold leading-6">
+                  {t.userMessage}
                 </p>
+                <p className="mt-2 text-xs font-bold text-blue-100">10:23</p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-start">
+              <div
+                className={`max-w-[680px] rounded-[1.5rem] border px-5 py-4 ${softCardClass}`}
+              >
+                <p className={`text-sm font-semibold leading-7 ${titleClass}`}>
+                  {t.assistantMessage}
+                </p>
+                <p className={`mt-2 text-xs font-bold ${mutedClass}`}>10:24</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 p-5 dark:border-white/10 sm:p-6">
+            <div
+              className={`flex flex-col gap-3 rounded-3xl border p-3 sm:flex-row sm:items-center ${softCardClass}`}
+            >
+              <input
+                placeholder={t.inputPlaceholder}
+                className={`h-12 min-w-0 flex-1 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+              />
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  className={`inline-flex h-12 flex-1 items-center justify-center rounded-2xl border px-4 text-sm font-black transition sm:flex-none ${
+                    isDark
+                      ? "border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {t.attach}
+                </button>
 
                 <button
-                  onClick={handleNewChat}
-                  disabled={creating}
-                  className="mt-6 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                  type="button"
+                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 sm:flex-none"
                 >
-                  {creating ? t.common.loading : t.aiTutorPage.newChat}
+                  {t.send}
                 </button>
               </div>
-            )}
+            </div>
+          </div>
+        </section>
+
+        <aside className="grid min-w-0 gap-6">
+          <section className={`rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className={`text-xl font-black ${titleClass}`}>
+                {t.quickTips}
+              </h2>
+
+              <span className="rounded-full bg-blue-600/10 px-3 py-1 text-xs font-black text-blue-600">
+                {t.beta}
+              </span>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              {tips.map((tip) => (
+                <div
+                  key={tip.key}
+                  className={`flex min-w-0 gap-4 rounded-3xl border p-4 ${softCardClass}`}
+                >
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-lg ${
+                      isDark ? "bg-blue-500/15" : "bg-blue-600/10"
+                    }`}
+                  >
+                    {tip.icon}
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className={`text-sm font-black ${titleClass}`}>
+                      {t.tips[tip.key].title}
+                    </p>
+                    <p className={`mt-1 text-xs font-semibold leading-5 ${mutedClass}`}>
+                      {t.tips[tip.key].subtitle}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
-        </div>
-      </section>
-    </main>
+
+          <section className={`rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className={`text-xl font-black ${titleClass}`}>
+                {t.recentChats}
+              </h2>
+
+              <button
+                type="button"
+                className="text-sm font-black text-blue-600 transition hover:text-blue-700"
+              >
+                {t.viewAll}
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              {recentList.map((chat) => (
+                <button
+                  key={chat.key}
+                  type="button"
+                  className={`flex min-w-0 items-center gap-4 rounded-2xl p-3 text-left transition ${
+                    isDark
+                      ? "hover:bg-white/10"
+                      : "hover:bg-slate-50"
+                  }`}
+                >
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                      isDark ? "bg-blue-500/15" : "bg-blue-600/10"
+                    }`}
+                  >
+                    💬
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className={`truncate text-sm font-black ${titleClass}`}>
+                      {t.recent[chat.key]}
+                    </p>
+                    <p className={`mt-1 text-xs font-semibold ${mutedClass}`}>
+                      {chat.formattedDate}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-600 p-6 text-white shadow-sm shadow-blue-600/20">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-xl">
+              ✨
+            </div>
+
+            <h2 className="mt-5 text-xl font-black">{t.onlineTitle}</h2>
+
+            <p className="mt-2 text-sm font-medium leading-6 text-blue-100">
+              {t.onlineSubtitle}
+            </p>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+export default function AiTutorPage() {
+  return (
+    <AppShell>
+      <TutorContent />
+    </AppShell>
   );
 }

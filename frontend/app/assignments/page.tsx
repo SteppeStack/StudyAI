@@ -1,553 +1,836 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import AppSidebar from "@/components/AppSidebar";
-import { useLanguage } from "@/components/LanguageProvider";
+import { useEffect, useMemo, useState } from "react";
+import AppShell from "@/components/AppShell";
 
-const pageText = {
+type Language = "en" | "ru" | "kz";
+type Theme = "light" | "dark";
+type AssignmentStatus = "draft" | "inProgress" | "submitted" | "overdue";
+type FilterKey = "all" | AssignmentStatus;
+
+type AssignmentItem = {
+  id: number;
+  titleKey: "research" | "dataStructures" | "economics" | "statistics";
+  courseKey: "academicWriting" | "computerScience" | "economics" | "statistics";
+  status: AssignmentStatus;
+  dueDate: Date;
+  progress: number;
+  tasks: number;
+  completedTasks: number;
+};
+
+type AssignmentCopy = {
+  pageBadge: string;
+  pageTitle: string;
+  pageSubtitle: string;
+  createAssignment: string;
+  searchPlaceholder: string;
+  filters: Record<FilterKey, string>;
+  stats: {
+    total: string;
+    inProgress: string;
+    submitted: string;
+    overdue: string;
+  };
+  sectionTitle: string;
+  sectionSubtitle: string;
+  continue: string;
+  open: string;
+  due: string;
+  progress: string;
+  tasks: string;
+  completed: string;
+  emptyTitle: string;
+  emptySubtitle: string;
+  resetFilters: string;
+  upcomingTitle: string;
+  upcomingSubtitle: string;
+  priority: string;
+  aiHelperTitle: string;
+  aiHelperSubtitle: string;
+  generateDraft: string;
+  improveText: string;
+  checkStructure: string;
+  titles: Record<AssignmentItem["titleKey"], string>;
+  courses: Record<AssignmentItem["courseKey"], string>;
+  statuses: Record<AssignmentStatus, string>;
+};
+
+const copy: Record<Language, AssignmentCopy> = {
   en: {
-    title: "Assignments",
-    subtitle: "Create assignment tasks, generate solution plans, and check answers.",
-    formTitle: "Assignment Helper",
-    formSubtitle:
-      "Fill in the assignment details and choose what kind of help you need.",
-    assignmentTitle: "Assignment title",
-    assignmentTitlePlaceholder: "Example: Microeconomics homework",
-    subject: "Subject",
-    helpType: "Type of help",
-    deadline: "Deadline",
-    deadlinePlaceholder: "MM/DD/YYYY",
-    description: "Assignment description",
-    descriptionPlaceholder: "Paste or describe your assignment here...",
-    studentAnswer: "Student answer",
-    studentAnswerPlaceholder: "Paste your answer here if you want to check it...",
-    generatePlan: "Generate solution plan",
-    checkAnswer: "Check answer",
-    clear: "Clear",
-    generatedPlan: "Generated Plan",
-    answerFeedback: "Answer Feedback",
-    required: "Please fill in the assignment title, subject, help type, and description.",
-    answerRequired: "Please enter your answer first.",
-    backToDashboard: "Back to Dashboard",
-    frontendNoteTitle: "Frontend status",
-    frontendNote:
-      "This page includes the frontend UI for assignment creation, subject selection, help type selection, plan generation preview, and answer checking preview. Real AI generation can be connected later through backend/API.",
-    planReady: "Plan generated successfully.",
-    feedbackReady: "Answer feedback generated successfully.",
-    subjects: [
-      "Mathematics",
-      "Economics",
-      "Programming",
-      "English",
-      "Physics",
-      "Statistics",
-      "Business",
-      "Other",
-    ],
-    helpTypes: [
-      { value: "explain", label: "Explain the task" },
-      { value: "solution_plan", label: "Create solution plan" },
-      { value: "check_answer", label: "Check my answer" },
-      { value: "improve_text", label: "Improve my text" },
-      { value: "outline", label: "Generate outline" },
-    ],
-    previewCards: [
-      {
-        title: "Subject selection",
-        text: "Choose the academic subject for better assignment context.",
-      },
-      {
-        title: "Help type",
-        text: "Select whether you need explanation, planning, or answer checking.",
-      },
-      {
-        title: "Solution plan",
-        text: "Generate a structured step-by-step plan for the assignment.",
-      },
-    ],
-    planSteps: [
-      "Read the assignment carefully and identify the main objective.",
-      "Break the task into smaller parts and define what needs to be solved first.",
-      "Collect the required formulas, theory, sources, or examples.",
-      "Create a structured answer using clear sections.",
-      "Review the final work and check whether it answers the assignment fully.",
-    ],
-    feedbackItems: [
-      "Your answer has a clear structure, but it may need more detail.",
-      "Add stronger explanations and connect your points to the assignment question.",
-      "Check grammar, formatting, and whether all required parts are included.",
-    ],
+    pageBadge: "Assignments workspace",
+    pageTitle: "Assignments",
+    pageSubtitle:
+      "Create, track, and complete your academic tasks in one organized place.",
+    createAssignment: "Create assignment",
+    searchPlaceholder: "Search assignments...",
+    filters: {
+      all: "All",
+      draft: "Drafts",
+      inProgress: "In progress",
+      submitted: "Submitted",
+      overdue: "Overdue",
+    },
+    stats: {
+      total: "Total assignments",
+      inProgress: "In progress",
+      submitted: "Submitted",
+      overdue: "Overdue",
+    },
+    sectionTitle: "Your assignments",
+    sectionSubtitle: "Track deadlines, progress, and submission status.",
+    continue: "Continue",
+    open: "Open",
+    due: "Due",
+    progress: "Progress",
+    tasks: "tasks",
+    completed: "completed",
+    emptyTitle: "No assignments found",
+    emptySubtitle:
+      "Try another search or reset the filters to see all assignments.",
+    resetFilters: "Reset filters",
+    upcomingTitle: "Upcoming focus",
+    upcomingSubtitle: "The next task that needs your attention.",
+    priority: "Priority",
+    aiHelperTitle: "AI assignment helper",
+    aiHelperSubtitle:
+      "Use AI Tutor to outline, improve, or review your assignment before submission.",
+    generateDraft: "Generate draft",
+    improveText: "Improve text",
+    checkStructure: "Check structure",
+    titles: {
+      research: "Research Paper Draft",
+      dataStructures: "Data Structures Assignment",
+      economics: "Market Analysis Essay",
+      statistics: "Statistics Problem Set",
+    },
+    courses: {
+      academicWriting: "Academic Writing",
+      computerScience: "Computer Science",
+      economics: "Economics",
+      statistics: "Business Statistics",
+    },
+    statuses: {
+      draft: "Draft",
+      inProgress: "In progress",
+      submitted: "Submitted",
+      overdue: "Overdue",
+    },
   },
-
   ru: {
-    title: "Задания",
-    subtitle: "Создавайте задания, генерируйте план решения и проверяйте ответы.",
-    formTitle: "Assignment Helper",
-    formSubtitle:
-      "Заполните данные задания и выберите, какая помощь вам нужна.",
-    assignmentTitle: "Название задания",
-    assignmentTitlePlaceholder: "Например: Домашнее задание по микроэкономике",
-    subject: "Предмет",
-    helpType: "Тип помощи",
-    deadline: "Дедлайн",
-    deadlinePlaceholder: "ДД.ММ.ГГ",
-    description: "Описание задания",
-    descriptionPlaceholder: "Вставьте или опишите ваше задание здесь...",
-    studentAnswer: "Ответ студента",
-    studentAnswerPlaceholder: "Вставьте ваш ответ, если хотите проверить его...",
-    generatePlan: "Сгенерировать план решения",
-    checkAnswer: "Проверить ответ",
-    clear: "Очистить",
-    generatedPlan: "Сгенерированный план",
-    answerFeedback: "Проверка ответа",
-    required:
-      "Пожалуйста, заполните название задания, предмет, тип помощи и описание.",
-    answerRequired: "Сначала введите ваш ответ.",
-    backToDashboard: "Назад в панель",
-    frontendNoteTitle: "Frontend статус",
-    frontendNote:
-      "Эта страница содержит frontend UI для создания задания, выбора предмета, выбора типа помощи, предварительной генерации плана и проверки ответа. Настоящую AI-генерацию можно подключить позже через backend/API.",
-    planReady: "План успешно сгенерирован.",
-    feedbackReady: "Проверка ответа успешно сгенерирована.",
-    subjects: [
-      "Математика",
-      "Экономика",
-      "Программирование",
-      "Английский",
-      "Физика",
-      "Статистика",
-      "Бизнес",
-      "Другое",
-    ],
-    helpTypes: [
-      { value: "explain", label: "Объяснить задание" },
-      { value: "solution_plan", label: "Создать план решения" },
-      { value: "check_answer", label: "Проверить мой ответ" },
-      { value: "improve_text", label: "Улучшить текст" },
-      { value: "outline", label: "Создать структуру" },
-    ],
-    previewCards: [
-      {
-        title: "Выбор предмета",
-        text: "Выберите учебный предмет, чтобы лучше определить контекст задания.",
-      },
-      {
-        title: "Тип помощи",
-        text: "Выберите объяснение, план решения или проверку ответа.",
-      },
-      {
-        title: "План решения",
-        text: "Получите структурированный пошаговый план выполнения задания.",
-      },
-    ],
-    planSteps: [
-      "Внимательно прочитать задание и определить главную цель.",
-      "Разделить задание на маленькие части и понять, что нужно решить первым.",
-      "Собрать нужные формулы, теорию, источники или примеры.",
-      "Составить структурированный ответ с понятными разделами.",
-      "Проверить финальную работу и убедиться, что она полностью отвечает заданию.",
-    ],
-    feedbackItems: [
-      "Ответ имеет понятную структуру, но его можно раскрыть подробнее.",
-      "Добавьте более сильные объяснения и свяжите аргументы с вопросом задания.",
-      "Проверьте грамматику, форматирование и наличие всех обязательных частей.",
-    ],
+    pageBadge: "Assignments workspace",
+    pageTitle: "Задания",
+    pageSubtitle:
+      "Создавай, отслеживай и завершай учебные задания в одном удобном месте.",
+    createAssignment: "Создать задание",
+    searchPlaceholder: "Поиск заданий...",
+    filters: {
+      all: "Все",
+      draft: "Черновики",
+      inProgress: "В работе",
+      submitted: "Отправлено",
+      overdue: "Просрочено",
+    },
+    stats: {
+      total: "Всего заданий",
+      inProgress: "В работе",
+      submitted: "Отправлено",
+      overdue: "Просрочено",
+    },
+    sectionTitle: "Твои задания",
+    sectionSubtitle: "Следи за дедлайнами, прогрессом и статусом отправки.",
+    continue: "Продолжить",
+    open: "Открыть",
+    due: "Срок",
+    progress: "Прогресс",
+    tasks: "задач",
+    completed: "выполнено",
+    emptyTitle: "Задания не найдены",
+    emptySubtitle:
+      "Попробуй изменить поиск или сбросить фильтры, чтобы увидеть все задания.",
+    resetFilters: "Сбросить фильтры",
+    upcomingTitle: "Ближайший фокус",
+    upcomingSubtitle: "Следующее задание, которое требует внимания.",
+    priority: "Приоритет",
+    aiHelperTitle: "AI-помощник по заданиям",
+    aiHelperSubtitle:
+      "Используй AI Tutor, чтобы составить план, улучшить текст или проверить структуру перед отправкой.",
+    generateDraft: "Создать черновик",
+    improveText: "Улучшить текст",
+    checkStructure: "Проверить структуру",
+    titles: {
+      research: "Черновик исследовательской работы",
+      dataStructures: "Задание по структурам данных",
+      economics: "Эссе по анализу рынка",
+      statistics: "Задачи по статистике",
+    },
+    courses: {
+      academicWriting: "Academic Writing",
+      computerScience: "Computer Science",
+      economics: "Economics",
+      statistics: "Business Statistics",
+    },
+    statuses: {
+      draft: "Черновик",
+      inProgress: "В работе",
+      submitted: "Отправлено",
+      overdue: "Просрочено",
+    },
   },
-
   kz: {
-    title: "Тапсырмалар",
-    subtitle: "Тапсырма құрып, шешім жоспарын жасап, жауаптарды тексеріңіз.",
-    formTitle: "Assignment Helper",
-    formSubtitle:
-      "Тапсырма мәліметтерін толтырып, қандай көмек қажет екенін таңдаңыз.",
-    assignmentTitle: "Тапсырма атауы",
-    assignmentTitlePlaceholder: "Мысалы: Микроэкономика үй тапсырмасы",
-    subject: "Пән",
-    helpType: "Көмек түрі",
-    deadline: "Мерзім",
-    deadlinePlaceholder: "ДД.ММ.ГГ",
-    description: "Тапсырма сипаттамасы",
-    descriptionPlaceholder: "Тапсырманы осында енгізіңіз немесе сипаттаңыз...",
-    studentAnswer: "Студент жауабы",
-    studentAnswerPlaceholder: "Жауапты тексеру үшін осында енгізіңіз...",
-    generatePlan: "Шешім жоспарын жасау",
-    checkAnswer: "Жауапты тексеру",
-    clear: "Тазалау",
-    generatedPlan: "Жасалған жоспар",
-    answerFeedback: "Жауапты тексеру",
-    required: "Тапсырма атауын, пәнді, көмек түрін және сипаттаманы толтырыңыз.",
-    answerRequired: "Алдымен жауабыңызды енгізіңіз.",
-    backToDashboard: "Панельге қайту",
-    frontendNoteTitle: "Frontend статусы",
-    frontendNote:
-      "Бұл бетте тапсырма құру, пән таңдау, көмек түрін таңдау, жоспар preview және жауап тексеру preview үшін frontend UI бар. Нақты AI генерация кейін backend/API арқылы қосылады.",
-    planReady: "Жоспар сәтті жасалды.",
-    feedbackReady: "Жауап тексеруі сәтті жасалды.",
-    subjects: [
-      "Математика",
-      "Экономика",
-      "Бағдарламалау",
-      "Ағылшын",
-      "Физика",
-      "Статистика",
-      "Бизнес",
-      "Басқа",
-    ],
-    helpTypes: [
-      { value: "explain", label: "Тапсырманы түсіндіру" },
-      { value: "solution_plan", label: "Шешім жоспарын жасау" },
-      { value: "check_answer", label: "Жауабымды тексеру" },
-      { value: "improve_text", label: "Мәтінді жақсарту" },
-      { value: "outline", label: "Құрылым жасау" },
-    ],
-    previewCards: [
-      {
-        title: "Пән таңдау",
-        text: "Тапсырма контекстін жақсырақ анықтау үшін пәнді таңдаңыз.",
-      },
-      {
-        title: "Көмек түрі",
-        text: "Түсіндіру, шешім жоспары немесе жауап тексеруді таңдаңыз.",
-      },
-      {
-        title: "Шешім жоспары",
-        text: "Тапсырма үшін құрылымды қадамдық жоспар алыңыз.",
-      },
-    ],
-    planSteps: [
-      "Тапсырманы мұқият оқып, негізгі мақсатты анықтау.",
-      "Тапсырманы кіші бөліктерге бөліп, алдымен не шешілетінін анықтау.",
-      "Қажетті формулаларды, теорияны, дереккөздерді немесе мысалдарды жинау.",
-      "Жауапты түсінікті бөлімдер арқылы құрылымдау.",
-      "Соңғы жұмысты тексеріп, тапсырмаға толық жауап беретінін анықтау.",
-    ],
-    feedbackItems: [
-      "Жауаптың құрылымы түсінікті, бірақ оны толығырақ ашуға болады.",
-      "Түсіндірулерді күшейтіп, ойларыңызды тапсырма сұрағымен байланыстырыңыз.",
-      "Грамматика, формат және барлық қажетті бөліктердің барын тексеріңіз.",
-    ],
+    pageBadge: "Assignments workspace",
+    pageTitle: "Тапсырмалар",
+    pageSubtitle:
+      "Оқу тапсырмаларын бір жерде құрыңыз, бақылаңыз және аяқтаңыз.",
+    createAssignment: "Тапсырма құру",
+    searchPlaceholder: "Тапсырмаларды іздеу...",
+    filters: {
+      all: "Барлығы",
+      draft: "Черновиктер",
+      inProgress: "Жұмыста",
+      submitted: "Жіберілді",
+      overdue: "Мерзімі өтті",
+    },
+    stats: {
+      total: "Барлық тапсырма",
+      inProgress: "Жұмыста",
+      submitted: "Жіберілді",
+      overdue: "Мерзімі өтті",
+    },
+    sectionTitle: "Сіздің тапсырмаларыңыз",
+    sectionSubtitle:
+      "Дедлайндарды, прогресті және жіберу статусын бақылаңыз.",
+    continue: "Жалғастыру",
+    open: "Ашу",
+    due: "Мерзім",
+    progress: "Прогресс",
+    tasks: "тапсырма",
+    completed: "аяқталды",
+    emptyTitle: "Тапсырмалар табылмады",
+    emptySubtitle:
+      "Басқа іздеу қолданып көріңіз немесе барлық тапсырманы көру үшін фильтрді тазалаңыз.",
+    resetFilters: "Фильтрді тазалау",
+    upcomingTitle: "Жақын фокус",
+    upcomingSubtitle: "Назар аударуды қажет ететін келесі тапсырма.",
+    priority: "Приоритет",
+    aiHelperTitle: "AI тапсырма көмекшісі",
+    aiHelperSubtitle:
+      "AI Tutor арқылы жоспар құрып, мәтінді жақсартып немесе құрылымды тексеруге болады.",
+    generateDraft: "Черновик жасау",
+    improveText: "Мәтінді жақсарту",
+    checkStructure: "Құрылымды тексеру",
+    titles: {
+      research: "Зерттеу жұмысының черновигі",
+      dataStructures: "Деректер құрылымы тапсырмасы",
+      economics: "Нарық талдауы эссесі",
+      statistics: "Статистика есептері",
+    },
+    courses: {
+      academicWriting: "Academic Writing",
+      computerScience: "Computer Science",
+      economics: "Economics",
+      statistics: "Business Statistics",
+    },
+    statuses: {
+      draft: "Черновик",
+      inProgress: "Жұмыста",
+      submitted: "Жіберілді",
+      overdue: "Мерзімі өтті",
+    },
   },
 };
 
-type HelpType = "explain" | "solution_plan" | "check_answer" | "improve_text" | "outline";
+const languageStorageKeys = [
+  "studyai-language",
+  "studyai_lang",
+  "language",
+  "locale",
+];
 
-export default function AssignmentsPage() {
-  const { language } = useLanguage();
-  const text = pageText[language];
+const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 
-  const [assignmentTitle, setAssignmentTitle] = useState("");
-  const [subjectIndex, setSubjectIndex] = useState(0);
-  const [helpType, setHelpType] = useState<HelpType>("solution_plan");
-  const [deadline, setDeadline] = useState("");
-  const [description, setDescription] = useState("");
-  const [studentAnswer, setStudentAnswer] = useState("");
+const assignments: AssignmentItem[] = [
+  {
+    id: 1,
+    titleKey: "dataStructures",
+    courseKey: "computerScience",
+    status: "inProgress",
+    dueDate: new Date("2026-05-21T12:00:00"),
+    progress: 68,
+    tasks: 5,
+    completedTasks: 3,
+  },
+  {
+    id: 2,
+    titleKey: "research",
+    courseKey: "academicWriting",
+    status: "draft",
+    dueDate: new Date("2026-05-24T12:00:00"),
+    progress: 42,
+    tasks: 6,
+    completedTasks: 2,
+  },
+  {
+    id: 3,
+    titleKey: "economics",
+    courseKey: "economics",
+    status: "submitted",
+    dueDate: new Date("2026-05-18T12:00:00"),
+    progress: 100,
+    tasks: 4,
+    completedTasks: 4,
+  },
+  {
+    id: 4,
+    titleKey: "statistics",
+    courseKey: "statistics",
+    status: "overdue",
+    dueDate: new Date("2026-05-16T12:00:00"),
+    progress: 35,
+    tasks: 8,
+    completedTasks: 3,
+  },
+];
 
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [showPlan, setShowPlan] = useState(false);
-  const [showFeedback, setShowFeedback] = useState(false);
+function getStoredLanguage(): Language {
+  if (typeof window === "undefined") return "ru";
 
-  const subject = text.subjects[subjectIndex] || text.subjects[0];
+  for (const key of languageStorageKeys) {
+    const value = window.localStorage.getItem(key);
 
-  const selectedHelpTypeLabel = useMemo(() => {
-    return (
-      text.helpTypes.find((item) => item.value === helpType)?.label ||
-      text.helpTypes[0].label
-    );
-  }, [helpType, text.helpTypes]);
+    if (value === "en" || value === "ru" || value === "kz") {
+      return value;
+    }
+  }
 
-  function handleGeneratePlan(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  return "ru";
+}
 
-    setErrorMessage("");
-    setSuccessMessage("");
-    setShowFeedback(false);
+function getStoredTheme(): Theme {
+  if (typeof window === "undefined") return "dark";
 
-    if (
-      !assignmentTitle.trim() ||
-      !subject.trim() ||
-      !helpType.trim() ||
-      !description.trim()
-    ) {
-      setErrorMessage(text.required);
-      setShowPlan(false);
-      return;
+  for (const key of themeStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "light" || value === "dark") {
+      return value;
+    }
+  }
+
+  return "dark";
+}
+
+function formatDate(date: Date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+
+  return `${day}.${month}.${year}`;
+}
+
+function getStatusColor(status: AssignmentStatus, isDark: boolean) {
+  if (status === "submitted") {
+    return isDark
+      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+      : "border-emerald-100 bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "overdue") {
+    return isDark
+      ? "border-red-400/20 bg-red-400/10 text-red-200"
+      : "border-red-100 bg-red-50 text-red-700";
+  }
+
+  if (status === "inProgress") {
+    return isDark
+      ? "border-blue-400/20 bg-blue-400/10 text-blue-200"
+      : "border-blue-100 bg-blue-50 text-blue-700";
+  }
+
+  return isDark
+    ? "border-violet-400/20 bg-violet-400/10 text-violet-200"
+    : "border-violet-100 bg-violet-50 text-violet-700";
+}
+
+function AssignmentsContent() {
+  const [language, setLanguage] = useState<Language>("ru");
+  const [theme, setTheme] = useState<Theme>("dark");
+  const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
+  const [search, setSearch] = useState("");
+
+  const t = copy[language];
+  const isDark = theme === "dark";
+
+  useEffect(() => {
+    setLanguage(getStoredLanguage());
+    setTheme(getStoredTheme());
+
+    function handleLanguageChange(event: Event) {
+      const customEvent = event as CustomEvent<Language>;
+
+      if (
+        customEvent.detail === "en" ||
+        customEvent.detail === "ru" ||
+        customEvent.detail === "kz"
+      ) {
+        setLanguage(customEvent.detail);
+      }
     }
 
-    setShowPlan(true);
-    setSuccessMessage(text.planReady);
-  }
+    function handleThemeChange(event: Event) {
+      const customEvent = event as CustomEvent<Theme>;
 
-  function handleCheckAnswer() {
-    setErrorMessage("");
-    setSuccessMessage("");
-    setShowPlan(false);
-
-    if (!studentAnswer.trim()) {
-      setErrorMessage(text.answerRequired);
-      setShowFeedback(false);
-      return;
+      if (customEvent.detail === "light" || customEvent.detail === "dark") {
+        setTheme(customEvent.detail);
+      }
     }
 
-    setShowFeedback(true);
-    setSuccessMessage(text.feedbackReady);
-  }
+    function handleStorageChange() {
+      setLanguage(getStoredLanguage());
+      setTheme(getStoredTheme());
+    }
 
-  function handleClear() {
-    setAssignmentTitle("");
-    setSubjectIndex(0);
-    setHelpType("solution_plan");
-    setDeadline("");
-    setDescription("");
-    setStudentAnswer("");
-    setErrorMessage("");
-    setSuccessMessage("");
-    setShowPlan(false);
-    setShowFeedback(false);
-  }
+    window.addEventListener("studyai:language-change", handleLanguageChange);
+    window.addEventListener("studyai:theme-change", handleThemeChange);
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener(
+        "studyai:language-change",
+        handleLanguageChange
+      );
+      window.removeEventListener("studyai:theme-change", handleThemeChange);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
+
+  const stats = useMemo(() => {
+    return {
+      total: assignments.length,
+      inProgress: assignments.filter((item) => item.status === "inProgress")
+        .length,
+      submitted: assignments.filter((item) => item.status === "submitted")
+        .length,
+      overdue: assignments.filter((item) => item.status === "overdue").length,
+    };
+  }, []);
+
+  const filteredAssignments = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return assignments.filter((assignment) => {
+      const matchesStatus =
+        activeFilter === "all" || assignment.status === activeFilter;
+
+      const searchableText = [
+        t.titles[assignment.titleKey],
+        t.courses[assignment.courseKey],
+        t.statuses[assignment.status],
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch = !query || searchableText.includes(query);
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [activeFilter, search, t]);
+
+  const nextAssignment = useMemo(() => {
+    return [...assignments]
+      .filter((assignment) => assignment.status !== "submitted")
+      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0];
+  }, []);
+
+  const pageClass = isDark
+    ? "min-h-full bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8"
+    : "min-h-full bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8";
+
+  const cardClass = isDark
+    ? "border-white/10 bg-slate-900/70 shadow-sm"
+    : "border-slate-200 bg-white shadow-sm";
+
+  const softCardClass = isDark
+    ? "border-white/10 bg-slate-950/50"
+    : "border-slate-200 bg-slate-50";
+
+  const titleClass = isDark ? "text-white" : "text-slate-950";
+  const textClass = isDark ? "text-slate-300" : "text-slate-600";
+  const mutedClass = isDark ? "text-slate-400" : "text-slate-500";
+
+  const inputClass = isDark
+    ? "border-white/10 bg-slate-950/70 text-white placeholder:text-slate-500 focus:border-blue-400 focus:ring-blue-500/10"
+    : "border-slate-200 bg-white text-slate-950 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/10";
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <AppSidebar />
+    <div className={pageClass}>
+      <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section
+          className={`min-w-0 overflow-hidden rounded-[2rem] border p-5 sm:p-6 lg:p-8 xl:col-span-2 ${cardClass}`}
+        >
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+            <div className="min-w-0">
+              <div
+                className={`mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold ${
+                  isDark
+                    ? "border-blue-400/20 bg-blue-400/10 text-blue-200"
+                    : "border-blue-100 bg-blue-50 text-blue-700"
+                }`}
+              >
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                {t.pageBadge}
+              </div>
 
-      <section className="min-h-screen px-4 pb-8 pt-20 sm:px-6 lg:ml-[300px] lg:px-10 lg:py-10">
-        <div className="mx-auto w-full max-w-[1680px]">
-          <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">{text.title}</h1>
-              <p className="mt-2 text-slate-500">{text.subtitle}</p>
+              <h1
+                className={`text-3xl font-black tracking-tight sm:text-4xl ${titleClass}`}
+              >
+                {t.pageTitle}
+              </h1>
+
+              <p
+                className={`mt-3 max-w-3xl text-sm leading-6 sm:text-base ${textClass}`}
+              >
+                {t.pageSubtitle}
+              </p>
             </div>
 
             <Link
-              href="/dashboard"
-              className="w-fit rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              href="/assignments/new"
+              className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700"
             >
-              {text.backToDashboard}
+              {t.createAssignment}
             </Link>
-          </header>
+          </div>
+        </section>
 
-          <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_380px]">
-            <form
-              onSubmit={handleGeneratePlan}
-              className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
-            >
-              <div className="mb-8">
-                <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-2xl font-bold text-blue-600">
-                  A
-                </div>
+        <section className="min-w-0 xl:col-span-2">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className={`rounded-[1.75rem] border p-5 ${cardClass}`}>
+              <p className={`text-sm font-bold ${mutedClass}`}>
+                {t.stats.total}
+              </p>
+              <p className={`mt-3 text-3xl font-black ${titleClass}`}>
+                {stats.total}
+              </p>
+            </div>
 
-                <h2 className="text-2xl font-bold">{text.formTitle}</h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                  {text.formSubtitle}
-                </p>
-              </div>
+            <div className={`rounded-[1.75rem] border p-5 ${cardClass}`}>
+              <p className={`text-sm font-bold ${mutedClass}`}>
+                {t.stats.inProgress}
+              </p>
+              <p className={`mt-3 text-3xl font-black ${titleClass}`}>
+                {stats.inProgress}
+              </p>
+            </div>
 
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.assignmentTitle}
-                  </label>
+            <div className={`rounded-[1.75rem] border p-5 ${cardClass}`}>
+              <p className={`text-sm font-bold ${mutedClass}`}>
+                {t.stats.submitted}
+              </p>
+              <p className={`mt-3 text-3xl font-black ${titleClass}`}>
+                {stats.submitted}
+              </p>
+            </div>
 
-                  <input
-                    value={assignmentTitle}
-                    onChange={(e) => setAssignmentTitle(e.target.value)}
-                    placeholder={text.assignmentTitlePlaceholder}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+            <div className={`rounded-[1.75rem] border p-5 ${cardClass}`}>
+              <p className={`text-sm font-bold ${mutedClass}`}>
+                {t.stats.overdue}
+              </p>
+              <p className={`mt-3 text-3xl font-black ${titleClass}`}>
+                {stats.overdue}
+              </p>
+            </div>
+          </div>
+        </section>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.subject}
-                  </label>
+        <section
+          className={`min-w-0 rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}
+        >
+          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+            <div className="min-w-0">
+              <h2 className={`text-xl font-black ${titleClass}`}>
+                {t.sectionTitle}
+              </h2>
 
-                  <select
-                    value={String(subjectIndex)}
-                    onChange={(e) => setSubjectIndex(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                  >
-                    {text.subjects.map((item, index) => (
-                      <option key={item} value={String(index)}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <p className={`mt-1 text-sm leading-6 ${mutedClass}`}>
+                {t.sectionSubtitle}
+              </p>
+            </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.helpType}
-                  </label>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t.searchPlaceholder}
+              className={`h-11 w-full rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 lg:w-72 ${inputClass}`}
+            />
+          </div>
 
-                  <select
-                    value={helpType}
-                    onChange={(e) => setHelpType(e.target.value as HelpType)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                  >
-                    {text.helpTypes.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {(
+              ["all", "draft", "inProgress", "submitted", "overdue"] as FilterKey[]
+            ).map((filter) => {
+              const active = activeFilter === filter;
 
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.deadline}
-                  </label>
-
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                    placeholder={text.deadlinePlaceholder}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.description}
-                  </label>
-
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder={text.descriptionPlaceholder}
-                    rows={7}
-                    className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    {text.studentAnswer}
-                  </label>
-
-                  <textarea
-                    value={studentAnswer}
-                    onChange={(e) => setStudentAnswer(e.target.value)}
-                    placeholder={text.studentAnswerPlaceholder}
-                    rows={5}
-                    className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {errorMessage && (
-                <div className="mt-6 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                  {errorMessage}
-                </div>
-              )}
-
-              {successMessage && (
-                <div className="mt-6 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-medium text-green-600">
-                  {successMessage}
-                </div>
-              )}
-
-              <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              return (
                 <button
-                  type="submit"
-                  className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
-                >
-                  {text.generatePlan}
-                </button>
-
-                <button
+                  key={filter}
                   type="button"
-                  onClick={handleCheckAnswer}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  onClick={() => setActiveFilter(filter)}
+                  className={`rounded-2xl border px-4 py-2 text-sm font-black transition ${
+                    active
+                      ? "border-blue-500 bg-blue-600 text-white shadow-sm shadow-blue-600/20"
+                      : isDark
+                        ? "border-white/10 bg-slate-950/50 text-slate-300 hover:border-blue-400/30 hover:bg-blue-400/10"
+                        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-200 hover:bg-blue-50"
+                  }`}
                 >
-                  {text.checkAnswer}
+                  {t.filters[filter]}
                 </button>
+              );
+            })}
+          </div>
 
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-500 transition hover:bg-slate-50"
+          <div className="mt-6 grid gap-4">
+            {filteredAssignments.length > 0 ? (
+              filteredAssignments.map((assignment) => (
+                <article
+                  key={assignment.id}
+                  className={`min-w-0 rounded-[1.75rem] border p-5 ${softCardClass}`}
                 >
-                  {text.clear}
-                </button>
-              </div>
-
-              {showPlan && (
-                <section className="mt-8 rounded-3xl border border-blue-100 bg-blue-50 p-6">
-                  <div className="mb-5">
-                    <p className="text-sm font-semibold text-blue-600">
-                      {text.generatedPlan}
-                    </p>
-
-                    <h3 className="mt-1 text-xl font-bold text-slate-900">
-                      {assignmentTitle}
-                    </h3>
-
-                    <p className="mt-2 text-sm text-slate-600">
-                      {subject} · {selectedHelpTypeLabel}
-                      {deadline ? ` · ${deadline}` : ""}
-                    </p>
-                  </div>
-
-                  <ol className="space-y-4">
-                    {text.planSteps.map((step, index) => (
-                      <li key={step} className="flex gap-4">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                          {index + 1}
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getStatusColor(
+                            assignment.status,
+                            isDark
+                          )}`}
+                        >
+                          {t.statuses[assignment.status]}
                         </span>
-                        <span className="pt-1 text-sm leading-6 text-slate-700">
-                          {step}
+
+                        <span className={`text-xs font-bold ${mutedClass}`}>
+                          {t.due}: {formatDate(assignment.dueDate)}
                         </span>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              )}
+                      </div>
 
-              {showFeedback && (
-                <section className="mt-8 rounded-3xl border border-green-100 bg-green-50 p-6">
-                  <p className="text-sm font-semibold text-green-600">
-                    {text.answerFeedback}
-                  </p>
+                      <h3 className={`mt-4 text-lg font-black ${titleClass}`}>
+                        {t.titles[assignment.titleKey]}
+                      </h3>
 
-                  <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-700">
-                    {text.feedbackItems.map((item) => (
-                      <li key={item}>• {item}</li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-            </form>
-
-            <aside className="space-y-6">
-              <div className="rounded-3xl border border-blue-100 bg-blue-50 p-6 shadow-sm">
-                <h2 className="text-xl font-bold text-blue-600">
-                  {text.frontendNoteTitle}
-                </h2>
-
-                <p className="mt-4 text-sm leading-7 text-blue-700">
-                  {text.frontendNote}
-                </p>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="space-y-4">
-                  {text.previewCards.map((card) => (
-                    <div key={card.title} className="rounded-2xl bg-slate-50 p-5">
-                      <h3 className="font-bold">{card.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        {card.text}
+                      <p className={`mt-1 text-sm font-semibold ${mutedClass}`}>
+                        {t.courses[assignment.courseKey]}
                       </p>
                     </div>
-                  ))}
+
+                    <div className="flex shrink-0 gap-2">
+                      <Link
+                        href={`/assignments/${assignment.id}`}
+                        className={`inline-flex h-10 items-center justify-center rounded-2xl border px-4 text-sm font-black transition ${
+                          isDark
+                            ? "border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {t.open}
+                      </Link>
+
+                      <Link
+                        href={`/assignments/${assignment.id}`}
+                        className="inline-flex h-10 items-center justify-center rounded-2xl bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700"
+                      >
+                        {t.continue}
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <p className={`text-sm font-bold ${mutedClass}`}>
+                        {t.progress}
+                      </p>
+
+                      <p className={`text-sm font-black ${titleClass}`}>
+                        {assignment.progress}%
+                      </p>
+                    </div>
+
+                    <div
+                      className={`mt-2 h-3 overflow-hidden rounded-full ${
+                        isDark ? "bg-slate-950" : "bg-slate-200"
+                      }`}
+                    >
+                      <div
+                        className="h-full rounded-full bg-blue-600"
+                        style={{ width: `${assignment.progress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-bold ${
+                        isDark
+                          ? "bg-white/10 text-slate-300"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {assignment.completedTasks}/{assignment.tasks}{" "}
+                      {t.completed}
+                    </span>
+
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-bold ${
+                        isDark
+                          ? "bg-white/10 text-slate-300"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {assignment.tasks} {t.tasks}
+                    </span>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div
+                className={`rounded-[1.75rem] border p-8 text-center ${softCardClass}`}
+              >
+                <div
+                  className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-xl ${
+                    isDark ? "bg-blue-500/15" : "bg-blue-600/10"
+                  }`}
+                >
+                  🔎
                 </div>
+
+                <h3 className={`mt-4 text-xl font-black ${titleClass}`}>
+                  {t.emptyTitle}
+                </h3>
+
+                <p
+                  className={`mx-auto mt-2 max-w-md text-sm leading-6 ${mutedClass}`}
+                >
+                  {t.emptySubtitle}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveFilter("all");
+                    setSearch("");
+                  }}
+                  className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white transition hover:bg-blue-700"
+                >
+                  {t.resetFilters}
+                </button>
               </div>
-            </aside>
+            )}
           </div>
-        </div>
-      </section>
-    </main>
+        </section>
+
+        <aside className="grid min-w-0 gap-6">
+          <section className={`rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className={`text-xl font-black ${titleClass}`}>
+                  {t.upcomingTitle}
+                </h2>
+
+                <p className={`mt-1 text-sm leading-6 ${mutedClass}`}>
+                  {t.upcomingSubtitle}
+                </p>
+              </div>
+
+              <span className="rounded-full bg-blue-600/10 px-3 py-1 text-xs font-black text-blue-600">
+                {t.priority}
+              </span>
+            </div>
+
+            {nextAssignment && (
+              <div className={`mt-5 rounded-3xl border p-4 ${softCardClass}`}>
+                <span
+                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${getStatusColor(
+                    nextAssignment.status,
+                    isDark
+                  )}`}
+                >
+                  {t.statuses[nextAssignment.status]}
+                </span>
+
+                <h3 className={`mt-4 text-base font-black ${titleClass}`}>
+                  {t.titles[nextAssignment.titleKey]}
+                </h3>
+
+                <p className={`mt-1 text-sm font-semibold ${mutedClass}`}>
+                  {t.courses[nextAssignment.courseKey]}
+                </p>
+
+                <div className={`mt-4 rounded-2xl border p-4 ${softCardClass}`}>
+                  <p
+                    className={`text-xs font-bold uppercase tracking-wide ${mutedClass}`}
+                  >
+                    {t.due}
+                  </p>
+                  <p className={`mt-1 text-sm font-black ${titleClass}`}>
+                    {formatDate(nextAssignment.dueDate)}
+                  </p>
+                </div>
+
+                <Link
+                  href={`/assignments/${nextAssignment.id}`}
+                  className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-blue-600 text-sm font-black text-white transition hover:bg-blue-700"
+                >
+                  {t.continue}
+                </Link>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-600 p-6 text-white shadow-sm shadow-blue-600/20">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-xl">
+              ✨
+            </div>
+
+            <h2 className="mt-5 text-xl font-black">{t.aiHelperTitle}</h2>
+
+            <p className="mt-2 text-sm font-medium leading-6 text-blue-100">
+              {t.aiHelperSubtitle}
+            </p>
+
+            <div className="mt-5 grid gap-2">
+              <Link
+                href="/ai-tutor"
+                className="inline-flex h-10 items-center justify-center rounded-2xl bg-white text-sm font-black text-blue-700 transition hover:bg-blue-50"
+              >
+                {t.generateDraft}
+              </Link>
+
+              <Link
+                href="/ai-tutor"
+                className="inline-flex h-10 items-center justify-center rounded-2xl bg-white/15 text-sm font-black text-white transition hover:bg-white/20"
+              >
+                {t.improveText}
+              </Link>
+
+              <Link
+                href="/ai-tutor"
+                className="inline-flex h-10 items-center justify-center rounded-2xl bg-white/15 text-sm font-black text-white transition hover:bg-white/20"
+              >
+                {t.checkStructure}
+              </Link>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+export default function AssignmentsPage() {
+  return (
+    <AppShell>
+      <AssignmentsContent />
+    </AppShell>
   );
 }

@@ -1,403 +1,912 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import AppSidebar from "@/components/AppSidebar";
-import { useLanguage } from "@/components/LanguageProvider";
-import { supabase } from "@/lib/supabase";
-import {
-  ActivityEvent,
-  MonthlyUsage,
-  Subscription,
-  getCurrentMonthUsage,
-  getCurrentSubscription,
-  getRecentActivity,
-} from "@/lib/dashboardData";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import AppShell from "@/components/AppShell";
 
-type Profile = {
-  full_name: string | null;
-  email: string | null;
-  avatar_url: string | null;
-  subscription_plan: string | null;
-  account_role: string | null;
+type Language = "en" | "ru" | "kz";
+type Theme = "light" | "dark";
+
+type QuickActionKey =
+  | "askTutor"
+  | "newAssignment"
+  | "createDocument"
+  | "prepareExam"
+  | "uploadFile";
+
+type ModuleKey = "assignments" | "documents" | "examPrep" | "files";
+
+type ActivityTag = "document" | "assignment" | "aiTutor" | "examPrep";
+
+type DeadlineKey =
+  | "dataStructures"
+  | "researchDraft"
+  | "calculusSet";
+
+type DashboardCopy = {
+  pageTitle: string;
+  workspaceBadge: string;
+  welcomeTitle: string;
+  welcomeSubtitle: string;
+  quickActionsTitle: string;
+  quickActions: Record<
+    QuickActionKey,
+    {
+      title: string;
+      subtitle: string;
+      href: string;
+      icon: string;
+    }
+  >;
+  usageTitle: string;
+  usageSubtitle: string;
+  upgradePlan: string;
+  studyProgressTitle: string;
+  studyProgressSubtitle: string;
+  continue: string;
+  viewAll: string;
+  recentActivityTitle: string;
+  recentActivitySubtitle: string;
+  upcomingDeadlinesTitle: string;
+  upcomingDeadlinesSubtitle: string;
+  modules: Record<
+    ModuleKey,
+    {
+      title: string;
+      subtitle: string;
+      stat: string;
+      href: string;
+      icon: string;
+    }
+  >;
+  activities: {
+    researchDraft: string;
+    researchDraftTime: string;
+    dataStructures: string;
+    dataStructuresTime: string;
+    photosynthesis: string;
+    photosynthesisTime: string;
+    thermodynamics: string;
+    thermodynamicsTime: string;
+  };
+  activityTags: Record<ActivityTag, string>;
+  deadlines: Record<
+    DeadlineKey,
+    {
+      title: string;
+      due: string;
+      href: string;
+    }
+  >;
 };
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const { t } = useLanguage();
-
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [usage, setUsage] = useState<MonthlyUsage | null>(null);
-  const [activity, setActivity] = useState<ActivityEvent[]>([]);
-
-  const tools = [
-    {
-      title: t.tools.aiTutorTitle,
-      description: t.tools.aiTutorDescription,
-      href: "/ai-tutor",
+const copy: Record<Language, DashboardCopy> = {
+  en: {
+    pageTitle: "Dashboard",
+    workspaceBadge: "StudyAI Workspace",
+    welcomeTitle: "Welcome back 👋",
+    welcomeSubtitle:
+      "Continue your assignments, prepare for exams, review documents, and keep your study progress organized.",
+    quickActionsTitle: "Quick actions",
+    quickActions: {
+      askTutor: {
+        title: "Ask AI Tutor",
+        subtitle: "Get help instantly",
+        href: "/ai-tutor",
+        icon: "🤖",
+      },
+      newAssignment: {
+        title: "New assignment",
+        subtitle: "Create and track",
+        href: "/assignments",
+        icon: "✅",
+      },
+      createDocument: {
+        title: "Create document",
+        subtitle: "Draft with AI",
+        href: "/documents",
+        icon: "📄",
+      },
+      prepareExam: {
+        title: "Prepare for exam",
+        subtitle: "Smart practice",
+        href: "/exam-prep",
+        icon: "🎯",
+      },
+      uploadFile: {
+        title: "Upload file",
+        subtitle: "Store and organize",
+        href: "/files",
+        icon: "📁",
+      },
     },
-    {
-      title: t.tools.assignmentsTitle,
-      description: t.tools.assignmentsDescription,
-      href: "/assignments",
+    usageTitle: "AI usage",
+    usageSubtitle: "monthly limit used",
+    upgradePlan: "Upgrade plan",
+    studyProgressTitle: "Study progress",
+    studyProgressSubtitle: "Track your main academic workspace modules.",
+    continue: "Continue",
+    viewAll: "View all",
+    recentActivityTitle: "Recent activity",
+    recentActivitySubtitle: "Your latest saved academic work.",
+    upcomingDeadlinesTitle: "Upcoming deadlines",
+    upcomingDeadlinesSubtitle: "Stay ahead of important dates.",
+    modules: {
+      assignments: {
+        title: "Assignments",
+        subtitle: "active tasks",
+        stat: "7",
+        href: "/assignments",
+        icon: "✅",
+      },
+      documents: {
+        title: "Documents",
+        subtitle: "saved drafts",
+        stat: "14",
+        href: "/documents",
+        icon: "📄",
+      },
+      examPrep: {
+        title: "Exam Prep",
+        subtitle: "weekly progress",
+        stat: "62%",
+        href: "/exam-prep",
+        icon: "🎯",
+      },
+      files: {
+        title: "Files",
+        subtitle: "study materials",
+        stat: "28",
+        href: "/files",
+        icon: "📁",
+      },
     },
-    {
-      title: t.tools.diplomaTitle,
-      description: t.tools.diplomaDescription,
-      href: "/diploma",
+    activities: {
+      researchDraft: "Research Paper Draft",
+      researchDraftTime: "Edited 2 hours ago",
+      dataStructures: "Data Structures Assignment",
+      dataStructuresTime: "Submitted 4 hours ago",
+      photosynthesis: "Photosynthesis Process",
+      photosynthesisTime: "Explained 6 hours ago",
+      thermodynamics: "Thermodynamics Quiz",
+      thermodynamicsTime: "Completed yesterday",
     },
-    {
-      title: t.tools.documentsTitle,
-      description: t.tools.documentsDescription,
-      href: "/documents",
+    activityTags: {
+      document: "Document",
+      assignment: "Assignment",
+      aiTutor: "AI Tutor",
+      examPrep: "Exam Prep",
     },
-    {
-      title: t.tools.examPrepTitle,
-      description: t.tools.examPrepDescription,
-      href: "/exam-prep",
+    deadlines: {
+      dataStructures: {
+        title: "Data Structures Assignment",
+        due: "Due in 2 days",
+        href: "/assignments",
+      },
+      researchDraft: {
+        title: "Research Paper Draft",
+        due: "Due in 5 days",
+        href: "/documents",
+      },
+      calculusSet: {
+        title: "Calculus Problem Set",
+        due: "Due in 8 days",
+        href: "/exam-prep",
+      },
     },
-    {
-      title: t.tools.filesTitle,
-      description: t.tools.filesDescription,
-      href: "/files",
+  },
+  ru: {
+    pageTitle: "Главная",
+    workspaceBadge: "StudyAI Workspace",
+    welcomeTitle: "С возвращением 👋",
+    welcomeSubtitle:
+      "Продолжай задания, готовься к экзаменам, проверяй документы и держи учебный прогресс под контролем.",
+    quickActionsTitle: "Быстрые действия",
+    quickActions: {
+      askTutor: {
+        title: "Спросить AI Tutor",
+        subtitle: "Быстрая помощь",
+        href: "/ai-tutor",
+        icon: "🤖",
+      },
+      newAssignment: {
+        title: "Новое задание",
+        subtitle: "Создать и отслеживать",
+        href: "/assignments",
+        icon: "✅",
+      },
+      createDocument: {
+        title: "Создать документ",
+        subtitle: "Черновик через AI",
+        href: "/documents",
+        icon: "📄",
+      },
+      prepareExam: {
+        title: "Подготовка к экзамену",
+        subtitle: "Умная практика",
+        href: "/exam-prep",
+        icon: "🎯",
+      },
+      uploadFile: {
+        title: "Загрузить файл",
+        subtitle: "Хранить и организовать",
+        href: "/files",
+        icon: "📁",
+      },
     },
-  ];
+    usageTitle: "AI-использование",
+    usageSubtitle: "месячного лимита использовано",
+    upgradePlan: "Улучшить план",
+    studyProgressTitle: "Учебный прогресс",
+    studyProgressSubtitle: "Отслеживай основные модули учебного workspace.",
+    continue: "Продолжить",
+    viewAll: "Смотреть все",
+    recentActivityTitle: "Последняя активность",
+    recentActivitySubtitle: "Недавно сохранённые учебные материалы.",
+    upcomingDeadlinesTitle: "Ближайшие дедлайны",
+    upcomingDeadlinesSubtitle: "Следи за важными датами заранее.",
+    modules: {
+      assignments: {
+        title: "Задания",
+        subtitle: "активных задач",
+        stat: "7",
+        href: "/assignments",
+        icon: "✅",
+      },
+      documents: {
+        title: "Документы",
+        subtitle: "сохранённых черновиков",
+        stat: "14",
+        href: "/documents",
+        icon: "📄",
+      },
+      examPrep: {
+        title: "Экзамены",
+        subtitle: "прогресс за неделю",
+        stat: "62%",
+        href: "/exam-prep",
+        icon: "🎯",
+      },
+      files: {
+        title: "Файлы",
+        subtitle: "учебных материалов",
+        stat: "28",
+        href: "/files",
+        icon: "📁",
+      },
+    },
+    activities: {
+      researchDraft: "Черновик исследовательской работы",
+      researchDraftTime: "Изменено 2 часа назад",
+      dataStructures: "Задание по структурам данных",
+      dataStructuresTime: "Отправлено 4 часа назад",
+      photosynthesis: "Процесс фотосинтеза",
+      photosynthesisTime: "Объяснено 6 часов назад",
+      thermodynamics: "Тест по термодинамике",
+      thermodynamicsTime: "Завершено вчера",
+    },
+    activityTags: {
+      document: "Документ",
+      assignment: "Задание",
+      aiTutor: "AI Tutor",
+      examPrep: "Экзамены",
+    },
+    deadlines: {
+      dataStructures: {
+        title: "Задание по структурам данных",
+        due: "Срок через 2 дн.",
+        href: "/assignments",
+      },
+      researchDraft: {
+        title: "Черновик исследовательской работы",
+        due: "Срок через 5 дн.",
+        href: "/documents",
+      },
+      calculusSet: {
+        title: "Задачи по математическому анализу",
+        due: "Срок через 8 дн.",
+        href: "/exam-prep",
+      },
+    },
+  },
+  kz: {
+    pageTitle: "Басты бет",
+    workspaceBadge: "StudyAI Workspace",
+    welcomeTitle: "Қайта қош келдіңіз 👋",
+    welcomeSubtitle:
+      "Тапсырмаларды жалғастырып, емтиханға дайындалып, құжаттарды тексеріп, оқу прогресін бақылауда ұстаңыз.",
+    quickActionsTitle: "Жылдам әрекеттер",
+    quickActions: {
+      askTutor: {
+        title: "AI Tutor сұрау",
+        subtitle: "Жедел көмек",
+        href: "/ai-tutor",
+        icon: "🤖",
+      },
+      newAssignment: {
+        title: "Жаңа тапсырма",
+        subtitle: "Құру және бақылау",
+        href: "/assignments",
+        icon: "✅",
+      },
+      createDocument: {
+        title: "Құжат құру",
+        subtitle: "AI арқылы черновик",
+        href: "/documents",
+        icon: "📄",
+      },
+      prepareExam: {
+        title: "Емтиханға дайындық",
+        subtitle: "Ақылды тәжірибе",
+        href: "/exam-prep",
+        icon: "🎯",
+      },
+      uploadFile: {
+        title: "Файл жүктеу",
+        subtitle: "Сақтау және реттеу",
+        href: "/files",
+        icon: "📁",
+      },
+    },
+    usageTitle: "AI қолдану",
+    usageSubtitle: "айлық лимит пайдаланылды",
+    upgradePlan: "Жоспарды жақсарту",
+    studyProgressTitle: "Оқу прогресі",
+    studyProgressSubtitle: "Оқу workspace негізгі модульдерін бақылаңыз.",
+    continue: "Жалғастыру",
+    viewAll: "Барлығын көру",
+    recentActivityTitle: "Соңғы белсенділік",
+    recentActivitySubtitle: "Жақында сақталған оқу материалдары.",
+    upcomingDeadlinesTitle: "Жақын дедлайндар",
+    upcomingDeadlinesSubtitle: "Маңызды күндерді алдын ала бақылаңыз.",
+    modules: {
+      assignments: {
+        title: "Тапсырмалар",
+        subtitle: "белсенді тапсырма",
+        stat: "7",
+        href: "/assignments",
+        icon: "✅",
+      },
+      documents: {
+        title: "Құжаттар",
+        subtitle: "сақталған черновик",
+        stat: "14",
+        href: "/documents",
+        icon: "📄",
+      },
+      examPrep: {
+        title: "Емтихандар",
+        subtitle: "апталық прогресс",
+        stat: "62%",
+        href: "/exam-prep",
+        icon: "🎯",
+      },
+      files: {
+        title: "Файлдар",
+        subtitle: "оқу материалы",
+        stat: "28",
+        href: "/files",
+        icon: "📁",
+      },
+    },
+    activities: {
+      researchDraft: "Зерттеу жұмысының черновигі",
+      researchDraftTime: "2 сағат бұрын өзгертілді",
+      dataStructures: "Деректер құрылымы тапсырмасы",
+      dataStructuresTime: "4 сағат бұрын жіберілді",
+      photosynthesis: "Фотосинтез процесі",
+      photosynthesisTime: "6 сағат бұрын түсіндірілді",
+      thermodynamics: "Термодинамика тесті",
+      thermodynamicsTime: "Кеше аяқталды",
+    },
+    activityTags: {
+      document: "Құжат",
+      assignment: "Тапсырма",
+      aiTutor: "AI Tutor",
+      examPrep: "Емтихандар",
+    },
+    deadlines: {
+      dataStructures: {
+        title: "Деректер құрылымы тапсырмасы",
+        due: "2 күн қалды",
+        href: "/assignments",
+      },
+      researchDraft: {
+        title: "Зерттеу жұмысының черновигі",
+        due: "5 күн қалды",
+        href: "/documents",
+      },
+      calculusSet: {
+        title: "Математикалық анализ есептері",
+        due: "8 күн қалды",
+        href: "/exam-prep",
+      },
+    },
+  },
+};
 
-  useEffect(() => {
-    async function loadDashboard() {
-      const { data: sessionData } = await supabase.auth.getSession();
+const languageStorageKeys = [
+  "studyai-language",
+  "studyai_lang",
+  "language",
+  "locale",
+];
 
-      if (!sessionData.session) {
-        router.push("/login");
-        return;
-      }
+const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 
-      const user = sessionData.session.user;
+function getStoredLanguage(): Language {
+  if (typeof window === "undefined") return "ru";
 
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("full_name,email,avatar_url,subscription_plan,account_role")
-        .eq("id", user.id)
-        .single();
+  for (const key of languageStorageKeys) {
+    const value = window.localStorage.getItem(key);
 
-      if (profileData) {
-        setProfile(profileData as Profile);
-      }
-
-      const { data: subscriptionData } = await getCurrentSubscription();
-      const { data: usageData } = await getCurrentMonthUsage();
-      const { data: activityData } = await getRecentActivity();
-
-      setSubscription(subscriptionData as Subscription | null);
-      setUsage(usageData as MonthlyUsage | null);
-      setActivity((activityData || []) as ActivityEvent[]);
-      setLoading(false);
+    if (value === "en" || value === "ru" || value === "kz") {
+      return value;
     }
-
-    loadDashboard();
-  }, [router]);
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push("/login");
   }
 
-  function translatePlanName(planName: string) {
-    if (planName.toLowerCase() === "free") return t.common.free;
-    return planName;
+  return "ru";
+}
+
+function getStoredTheme(): Theme {
+  if (typeof window === "undefined") return "dark";
+
+  for (const key of themeStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "light" || value === "dark") {
+      return value;
+    }
   }
 
-  function translateRole(role: string) {
-    if (role.toLowerCase() === "student") return t.common.student;
-    return role;
-  }
+  return "dark";
+}
 
-  function translateStatus(status: string) {
-    if (status.toLowerCase() === "active") return t.common.active;
-    return status;
-  }
-
-  const currentPlanRaw = subscription?.plans;
-  const currentPlan = Array.isArray(currentPlanRaw)
-    ? currentPlanRaw[0]
-    : currentPlanRaw;
-
-  const planName = translatePlanName(currentPlan?.display_name || "Free");
-  const monthlyLimit = currentPlan?.monthly_ai_request_limit || 100;
-  const usedRequests = usage?.ai_requests_used || 0;
-  const documentsGenerated = usage?.documents_generated || 0;
-  const usagePercent = Math.min((usedRequests / monthlyLimit) * 100, 100);
-
-  const displayName = profile?.full_name || "Student";
-  const email = profile?.email || "";
-  const avatarUrl = profile?.avatar_url || "";
-
-  const initials = displayName
-    .split(" ")
-    .map((word) => word[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-50 text-slate-900">
-        <AppSidebar />
-
-        <section className="min-h-screen px-4 pt-20 lg:ml-[300px] lg:flex lg:items-center lg:justify-center lg:pt-0">
-          <div className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white px-8 py-6 text-center shadow-sm">
-            <p className="text-sm font-medium text-slate-600">
-              Loading dashboard...
-            </p>
-          </div>
-        </section>
-      </main>
-    );
-  }
+function getDisplayName() {
+  if (typeof window === "undefined") return "Student";
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <AppSidebar />
+    window.localStorage.getItem("studyai-display-name") ||
+    window.localStorage.getItem("studyai_display_name") ||
+    window.localStorage.getItem("displayName") ||
+    "Student"
+  );
+}
 
-      <section className="min-h-screen px-4 pb-8 pt-20 sm:px-6 lg:ml-[300px] lg:px-10 lg:py-10">
-        <div className="mx-auto w-full max-w-[1680px]">
-          <header className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold sm:text-3xl">
-                {t.dashboardPage.welcomeBack}, {displayName}
-              </h1>
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
 
-              <p className="mt-2 text-sm text-slate-500 sm:text-base">
-                {t.dashboardPage.subtitle}
-              </p>
-            </div>
+  if (parts.length === 0) return "ST";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-500 sm:w-[280px] xl:w-[360px]"
-                placeholder={t.dashboardPage.search}
-              />
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
 
-              <button
-                onClick={() => router.push("/settings")}
-                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:bg-slate-50"
-              >
-                {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt="Avatar"
-                    className="h-9 w-9 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-600">
-                    {initials || "ST"}
+function DashboardContent() {
+  const [language, setLanguage] = useState<Language>("ru");
+  const [theme, setTheme] = useState<Theme>("dark");
+  const [displayName, setDisplayName] = useState("Student");
+
+  const t = copy[language];
+  const isDark = theme === "dark";
+
+  useEffect(() => {
+    setLanguage(getStoredLanguage());
+    setTheme(getStoredTheme());
+    setDisplayName(getDisplayName());
+
+    function handleLanguageChange(event: Event) {
+      const customEvent = event as CustomEvent<Language>;
+
+      if (
+        customEvent.detail === "en" ||
+        customEvent.detail === "ru" ||
+        customEvent.detail === "kz"
+      ) {
+        setLanguage(customEvent.detail);
+      }
+    }
+
+    function handleThemeChange(event: Event) {
+      const customEvent = event as CustomEvent<Theme>;
+
+      if (customEvent.detail === "light" || customEvent.detail === "dark") {
+        setTheme(customEvent.detail);
+      }
+    }
+
+    function handleStorageChange() {
+      setLanguage(getStoredLanguage());
+      setTheme(getStoredTheme());
+      setDisplayName(getDisplayName());
+    }
+
+    window.addEventListener("studyai:language-change", handleLanguageChange);
+    window.addEventListener("studyai:theme-change", handleThemeChange);
+    window.addEventListener("studyai:profile-change", handleStorageChange);
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      window.removeEventListener(
+        "studyai:language-change",
+        handleLanguageChange
+      );
+      window.removeEventListener("studyai:theme-change", handleThemeChange);
+      window.removeEventListener("studyai:profile-change", handleStorageChange);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
+
+  const quickActions = useMemo(
+    () =>
+      [
+        t.quickActions.askTutor,
+        t.quickActions.newAssignment,
+        t.quickActions.createDocument,
+        t.quickActions.prepareExam,
+        t.quickActions.uploadFile,
+      ] as const,
+    [t]
+  );
+
+  const modules = useMemo(
+    () =>
+      [
+        t.modules.assignments,
+        t.modules.documents,
+        t.modules.examPrep,
+        t.modules.files,
+      ] as const,
+    [t]
+  );
+
+  const activities = useMemo(
+    () => [
+      {
+        title: t.activities.researchDraft,
+        time: t.activities.researchDraftTime,
+        tag: t.activityTags.document,
+        icon: "✓",
+        color: isDark
+          ? "bg-blue-500/15 text-blue-300"
+          : "bg-blue-50 text-blue-700",
+      },
+      {
+        title: t.activities.dataStructures,
+        time: t.activities.dataStructuresTime,
+        tag: t.activityTags.assignment,
+        icon: "✓",
+        color: isDark
+          ? "bg-emerald-500/15 text-emerald-300"
+          : "bg-emerald-50 text-emerald-700",
+      },
+      {
+        title: t.activities.photosynthesis,
+        time: t.activities.photosynthesisTime,
+        tag: t.activityTags.aiTutor,
+        icon: "✓",
+        color: isDark
+          ? "bg-violet-500/15 text-violet-300"
+          : "bg-violet-50 text-violet-700",
+      },
+      {
+        title: t.activities.thermodynamics,
+        time: t.activities.thermodynamicsTime,
+        tag: t.activityTags.examPrep,
+        icon: "✓",
+        color: isDark
+          ? "bg-orange-500/15 text-orange-300"
+          : "bg-orange-50 text-orange-700",
+      },
+    ],
+    [isDark, t]
+  );
+
+  const deadlines = useMemo(
+    () => [
+      {
+        date: "21 May",
+        ...t.deadlines.dataStructures,
+      },
+      {
+        date: "24 May",
+        ...t.deadlines.researchDraft,
+      },
+      {
+        date: "27 May",
+        ...t.deadlines.calculusSet,
+      },
+    ],
+    [t]
+  );
+
+  const pageClass = isDark
+    ? "min-h-full bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8"
+    : "min-h-full bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8";
+
+  const cardClass = isDark
+    ? "border-white/10 bg-slate-900/70 shadow-sm"
+    : "border-slate-200 bg-white shadow-sm";
+
+  const softCardClass = isDark
+    ? "border-white/10 bg-slate-950/50"
+    : "border-slate-200 bg-slate-50";
+
+  const titleClass = isDark ? "text-white" : "text-slate-950";
+  const textClass = isDark ? "text-slate-300" : "text-slate-600";
+  const mutedClass = isDark ? "text-slate-400" : "text-slate-500";
+
+  return (
+    <div className={pageClass}>
+      <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section
+          className={`min-w-0 overflow-hidden rounded-[2rem] border p-5 sm:p-6 lg:p-8 ${cardClass}`}
+        >
+          <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1 text-xs font-black text-blue-500">
+            <span className="h-2 w-2 rounded-full bg-blue-500" />
+            {t.workspaceBadge}
+          </div>
+
+          <div className="mt-5 flex flex-col gap-4">
+            <h1
+              className={`text-3xl font-black tracking-tight sm:text-4xl ${titleClass}`}
+            >
+              {t.welcomeTitle}
+            </h1>
+
+            <p className={`max-w-3xl text-sm leading-7 sm:text-base ${textClass}`}>
+              {t.welcomeSubtitle}
+            </p>
+          </div>
+
+          <div className="mt-8">
+            <h2 className={`text-lg font-black ${titleClass}`}>
+              {t.quickActionsTitle}
+            </h2>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              {quickActions.map((item) => (
+                <Link
+                  key={item.title}
+                  href={item.href}
+                  className={`min-w-0 rounded-[1.5rem] border p-4 transition hover:-translate-y-0.5 ${softCardClass}`}
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600/10 text-xl">
+                    {item.icon}
                   </div>
-                )}
 
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">
-                    {displayName}
+                  <p className={`mt-4 text-sm font-black ${titleClass}`}>
+                    {item.title}
                   </p>
-                  <p className="truncate text-xs text-slate-500">{email}</p>
-                </div>
-              </button>
 
-              <button
-                onClick={handleLogout}
-                className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800"
-              >
-                {t.common.logout}
-              </button>
+                  <p className={`mt-1 text-xs leading-5 ${mutedClass}`}>
+                    {item.subtitle}
+                  </p>
+                </Link>
+              ))}
             </div>
-          </header>
+          </div>
+        </section>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
-            <div className="space-y-6">
-              <section className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
-                {tools.map((tool) => (
-                  <button
-                    key={tool.href}
-                    onClick={() => router.push(tool.href)}
-                    className="rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-md"
-                  >
-                    <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-lg font-bold text-blue-600">
-                      {tool.title[0]}
-                    </div>
+        <aside className={`min-w-0 rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className={`text-sm font-bold ${mutedClass}`}>{t.usageTitle}</p>
+              <p className={`mt-2 text-4xl font-black ${titleClass}`}>78%</p>
+            </div>
 
-                    <h2 className="text-lg font-bold text-slate-900">
-                      {tool.title}
-                    </h2>
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600/10 text-lg">
+              ⚡
+            </div>
+          </div>
 
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      {tool.description}
-                    </p>
-                  </button>
-                ))}
-              </section>
+          <div className="mt-6 flex justify-center">
+            <div
+              className={`relative flex h-32 w-32 items-center justify-center rounded-full border-[10px] ${
+                isDark ? "border-slate-700" : "border-slate-200"
+              }`}
+              style={{
+                background: `conic-gradient(#2563eb 0% 78%, transparent 78% 100%)`,
+              }}
+            >
+              <div
+                className={`flex h-24 w-24 flex-col items-center justify-center rounded-full ${
+                  isDark ? "bg-slate-900" : "bg-white"
+                }`}
+              >
+                <span className={`text-3xl font-black ${titleClass}`}>78%</span>
+                <span className={`mt-1 text-center text-[11px] leading-4 ${mutedClass}`}>
+                  {t.usageSubtitle}
+                </span>
+              </div>
+            </div>
+          </div>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold">
-                      {t.dashboardPage.recentActivity}
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {t.dashboardPage.recentActivitySubtitle}
-                    </p>
+          <p className={`mt-5 text-center text-sm font-black ${titleClass}`}>
+            3,120 / 4,000 credits
+          </p>
+
+          <Link
+            href="/subscription"
+            className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700"
+          >
+            {t.upgradePlan}
+          </Link>
+        </aside>
+
+        <section className="min-w-0 xl:col-span-2">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {modules.map((module) => (
+              <Link
+                key={module.title}
+                href={module.href}
+                className={`min-w-0 rounded-[1.75rem] border p-5 transition hover:-translate-y-0.5 ${cardClass}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600/10 text-xl">
+                    {module.icon}
                   </div>
 
-                  <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                    {t.dashboardPage.viewAll}
-                  </button>
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${
+                      isDark
+                        ? "bg-slate-800 text-slate-200"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {t.continue}
+                  </span>
                 </div>
 
-                {activity.length > 0 ? (
-                  <div className="space-y-4">
-                    {activity.map((item) => (
+                <p className={`mt-5 text-base font-black ${titleClass}`}>
+                  {module.title}
+                </p>
+
+                <div className="mt-4 flex items-end gap-2">
+                  <span className={`text-4xl font-black ${titleClass}`}>
+                    {module.stat}
+                  </span>
+                  <span className={`pb-1 text-sm ${mutedClass}`}>
+                    {module.subtitle}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <section
+              className={`min-w-0 overflow-hidden rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className={`text-xl font-black ${titleClass}`}>
+                    {t.recentActivityTitle}
+                  </h2>
+                  <p className={`mt-1 text-sm leading-6 ${mutedClass}`}>
+                    {t.recentActivitySubtitle}
+                  </p>
+                </div>
+
+                <Link
+                  href="/files"
+                  className="shrink-0 text-sm font-black text-blue-600 hover:text-blue-700"
+                >
+                  {t.viewAll}
+                </Link>
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                {activities.map((item) => (
+                  <div
+                    key={item.title}
+                    className={`min-w-0 rounded-[1.5rem] border p-4 ${softCardClass}`}
+                  >
+                    <div className="flex min-w-0 items-start gap-3">
                       <div
-                        key={item.id}
-                        className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-4"
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${item.color}`}
                       >
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <p className="font-semibold text-slate-900">
+                        {item.icon}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <p className={`truncate text-sm font-black ${titleClass}`}>
                               {item.title}
                             </p>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                              {item.description || item.event_type}
+                            <p className={`mt-1 text-xs ${mutedClass}`}>
+                              {item.time}
                             </p>
                           </div>
 
-                          <span className="text-xs font-medium text-slate-400">
-                            {new Date(item.created_at).toLocaleDateString()}
+                          <span
+                            className={`inline-flex shrink-0 self-start rounded-full px-3 py-1 text-xs font-black ${
+                              isDark
+                                ? "bg-slate-800 text-slate-200"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {item.tag}
                           </span>
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
-                    <p className="font-semibold text-slate-700">
-                      {t.dashboardPage.noRecentActivity}
-                    </p>
+                ))}
+              </div>
+            </section>
 
-                    <p className="mt-2 text-sm text-slate-500">
-                      {t.dashboardPage.noRecentActivitySubtitle}
-                    </p>
-                  </div>
-                )}
-              </section>
-            </div>
-
-            <aside className="space-y-6">
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold">
-                  {t.dashboardPage.yourPlan}
-                </h2>
-
-                <div className="mt-5 rounded-2xl bg-blue-50 p-5">
-                  <p className="text-sm font-medium text-blue-600">
-                    {t.dashboardPage.currentPlan}
-                  </p>
-
-                  <p className="mt-1 text-2xl font-bold text-blue-700">
-                    {planName}
-                  </p>
-
-                  <p className="mt-2 text-sm text-blue-700">
-                    {monthlyLimit} {t.dashboardPage.aiRequestsPerMonth}
+            <section
+              className={`min-w-0 overflow-hidden rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className={`text-xl font-black ${titleClass}`}>
+                    {t.upcomingDeadlinesTitle}
+                  </h2>
+                  <p className={`mt-1 text-sm leading-6 ${mutedClass}`}>
+                    {t.upcomingDeadlinesSubtitle}
                   </p>
                 </div>
 
-                <button
-                  onClick={() => router.push("/subscription")}
-                  className="mt-5 w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                <Link
+                  href="/assignments"
+                  className="shrink-0 text-sm font-black text-blue-600 hover:text-blue-700"
                 >
-                  {t.dashboardPage.manageSubscription}
-                </button>
-              </section>
+                  {t.viewAll}
+                </Link>
+              </div>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold">
-                  {t.dashboardPage.usageThisMonth}
-                </h2>
+              <div className="mt-5 grid gap-3">
+                {deadlines.map((item) => (
+                  <div
+                    key={item.title}
+                    className={`min-w-0 overflow-hidden rounded-[1.5rem] border p-4 ${softCardClass}`}
+                  >
+                    <div className="flex min-w-0 flex-col gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div
+                          className={`flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-2xl text-[11px] font-black ${
+                            isDark
+                              ? "bg-blue-500/15 text-blue-200"
+                              : "bg-blue-50 text-blue-700"
+                          }`}
+                        >
+                          <span>{item.date.split(" ")[0]}</span>
+                          <span>{item.date.split(" ")[1]}</span>
+                        </div>
 
-                <div className="mt-5">
-                  <div className="mb-2 flex justify-between text-sm">
-                    <span className="text-slate-500">
-                      {t.dashboardPage.aiRequests}
-                    </span>
-                    <span className="font-semibold">
-                      {usedRequests} / {monthlyLimit}
-                    </span>
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate text-sm font-black ${titleClass}`}>
+                            {item.title}
+                          </p>
+                          <p className={`mt-1 text-xs ${mutedClass}`}>{item.due}</p>
+                        </div>
+                      </div>
+
+                      <Link
+                        href={item.href}
+                        className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700"
+                      >
+                        {t.continue}
+                      </Link>
+                    </div>
                   </div>
-
-                  <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-blue-600"
-                      style={{ width: `${usagePercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-6 grid grid-cols-2 gap-4">
-                  <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-sm text-slate-500">
-                      {t.dashboardPage.documents}
-                    </p>
-                    <p className="mt-1 text-xl font-bold">
-                      {documentsGenerated}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-sm text-slate-500">
-                      {t.dashboardPage.chats}
-                    </p>
-                    <p className="mt-1 text-xl font-bold">{activity.length}</p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold">
-                  {t.dashboardPage.quickStats}
-                </h2>
-
-                <div className="mt-5 space-y-4 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">
-                      {t.dashboardPage.accountRole}
-                    </span>
-                    <span className="font-semibold">
-                      {translateRole(profile?.account_role || "student")}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">
-                      {t.dashboardPage.planStatus}
-                    </span>
-                    <span className="font-semibold">
-                      {translateStatus(subscription?.status || "active")}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">
-                      {t.dashboardPage.workspace}
-                    </span>
-                    <span className="font-semibold">StudyAI</span>
-                  </div>
-                </div>
-              </section>
-            </aside>
+                ))}
+              </div>
+            </section>
           </div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <AppShell>
+      <DashboardContent />
+    </AppShell>
   );
 }
