@@ -41,9 +41,16 @@ class GeminiProvider:
             response = await client.post(url, params=params, json=payload)
 
         if response.status_code >= 400:
+            error_detail: str | dict[str, Any] = "Gemini API request failed"
+            if self.settings.app_env == "development":
+                error_detail = {
+                    "message": error_detail,
+                    "status_code": response.status_code,
+                    "provider_response": response.text[:1000],
+                }
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Gemini API request failed",
+                detail=error_detail,
             )
 
         data = response.json()

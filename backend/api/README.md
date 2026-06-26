@@ -73,7 +73,7 @@ SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 AI_PROVIDER=gemini
 GEMINI_API_KEY=
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` must never be used in frontend code.
@@ -91,3 +91,5 @@ If deploying only this API folder to Vercel, use `backend/api` as the project ro
 ```text
 api/index.py
 ```
+
+See `DEPLOYMENT.md` for the deployment checklist and required environment variables.
