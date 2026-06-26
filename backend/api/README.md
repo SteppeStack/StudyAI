@@ -8,9 +8,10 @@ It does not replace Supabase Auth or the Supabase database in Sprint 1. The fron
 
 - FastAPI application
 - Health endpoint: `GET /health`
+- AI Tutor endpoint: `POST /api/v1/ai/chat`
 - Interactive Swagger UI: `/docs`
 - CORS for the future Next.js frontend
-- One automated health-check test
+- Automated tests for health and AI route structure
 
 ## You Need To Do Once
 
@@ -64,4 +65,31 @@ python -m pytest
 
 Create a local `.env` file from `.env.example` only when a server-side feature needs configuration. Never commit the real `.env` file.
 
-`SUPABASE_SERVICE_ROLE_KEY` is reserved for future server-side Supabase calls and must never be used in frontend code.
+For the AI Tutor endpoint, fill:
+
+```env
+SUPABASE_URL=
+SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+AI_PROVIDER=gemini
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` must never be used in frontend code.
+
+## Frontend Contract
+
+See `AI_CHAT_API.md`.
+
+After this endpoint is deployed, the frontend should call `POST /api/v1/ai/chat` for AI Tutor messages instead of inserting `ai_messages` directly. The API saves both the user message and the Gemini assistant response.
+
+## Vercel
+
+If deploying only this API folder to Vercel, use `backend/api` as the project root. The Vercel entrypoint is:
+
+```text
+api/index.py
+```
+
+See `DEPLOYMENT.md` for the deployment checklist and required environment variables.
