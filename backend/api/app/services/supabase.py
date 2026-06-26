@@ -44,11 +44,17 @@ class SupabaseGateway:
             "Authorization": f"Bearer {access_token}",
         }
 
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.get(
-                f"{self.settings.supabase_url}/auth/v1/user",
-                headers=headers,
-            )
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.get(
+                    f"{self.settings.supabase_url}/auth/v1/user",
+                    headers=headers,
+                )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Supabase Auth is unreachable: {exc.__class__.__name__}",
+            ) from exc
 
         if response.status_code == 401:
             raise HTTPException(
@@ -57,12 +63,24 @@ class SupabaseGateway:
             )
 
         if response.status_code >= 400:
+            detail: str | dict[str, Any] = "Supabase Auth request failed"
+            if self.settings.app_env != "production":
+                detail = {
+                    "message": detail,
+                    "status_code": response.status_code,
+                    "provider_response": response.text[:1000],
+                }
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Supabase Auth request failed",
+                detail=detail,
             )
 
         data = response.json()
+        if "id" not in data:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Supabase Auth response did not include user id",
+            )
         return CurrentUser(id=data["id"], email=data.get("email"))
 
     async def get_or_create_conversation(
@@ -165,6 +183,156 @@ class SupabaseGateway:
             },
         )
 
+    async def insert_user_file(
+        self,
+        user_id: str,
+        bucket_id: str,
+        storage_path: str,
+        original_name: str,
+        content_type: str,
+        file_type: str,
+        size_bytes: int,
+    ) -> dict[str, Any]:
+        created = await self._rest_post(
+            "user_files",
+            {
+                "user_id": user_id,
+                "bucket_id": bucket_id,
+                "storage_path": storage_path,
+                "original_name": original_name,
+                "content_type": content_type,
+                "file_type": file_type,
+                "size_bytes": size_bytes,
+                "status": "uploaded",
+            },
+        )
+        return created[0]
+
+    async def list_user_files(self, user_id: str) -> list[dict[str, Any]]:
+        return await self._rest_get(
+            "user_files",
+            {
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "order": "created_at.desc",
+            },
+        )
+
+    async def get_user_file(self, user_id: str, file_id: str) -> dict[str, Any]:
+        files = await self._rest_get(
+            "user_files",
+            {
+                "id": f"eq.{file_id}",
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "limit": "1",
+            },
+        )
+        if not files:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found",
+            )
+        return files[0]
+
+    async def delete_user_file(self, user_id: str, file_id: str) -> None:
+        await self._rest_delete(
+            "user_files",
+            {
+                "id": f"eq.{file_id}",
+                "user_id": f"eq.{user_id}",
+            },
+        )
+
+    async def upload_storage_object(
+        self,
+        bucket_id: str,
+        storage_path: str,
+        content: bytes,
+        content_type: str,
+    ) -> None:
+        self._require_service_config()
+        headers = {
+            "apikey": self.settings.supabase_service_role_key,
+            "Authorization": f"Bearer {self.settings.supabase_service_role_key}",
+            "Content-Type": content_type,
+            "x-upsert": "false",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=45) as client:
+                response = await client.post(
+                    f"{self.settings.supabase_url}/storage/v1/object/{bucket_id}/{storage_path}",
+                    headers=headers,
+                    content=content,
+                )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Supabase Storage upload is unreachable: {exc.__class__.__name__}",
+            ) from exc
+        if response.status_code >= 400:
+            detail: str | dict[str, Any] = "Supabase Storage upload failed"
+            if self.settings.app_env != "production":
+                detail = {
+                    "message": detail,
+                    "status_code": response.status_code,
+                    "provider_response": response.text[:1000],
+                }
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=detail,
+            )
+
+    async def delete_storage_object(self, bucket_id: str, storage_path: str) -> None:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.request(
+                "DELETE",
+                f"{self.settings.supabase_url}/storage/v1/object/{bucket_id}",
+                headers=self._service_headers(),
+                json={"prefixes": [storage_path]},
+            )
+        if response.status_code >= 400:
+            detail: str | dict[str, Any] = "Supabase Storage delete failed"
+            if self.settings.app_env != "production":
+                detail = {
+                    "message": detail,
+                    "status_code": response.status_code,
+                    "provider_response": response.text[:1000],
+                }
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=detail,
+            )
+
+    async def create_storage_signed_url(
+        self,
+        bucket_id: str,
+        storage_path: str,
+        expires_in: int,
+    ) -> str:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                f"{self.settings.supabase_url}/storage/v1/object/sign/{bucket_id}/{storage_path}",
+                headers=self._service_headers(),
+                json={"expiresIn": expires_in},
+            )
+        if response.status_code >= 400:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Supabase Storage signed URL request failed",
+            )
+
+        data = response.json()
+        signed_url = data.get("signedURL") or data.get("signedUrl") or data.get("signed_url")
+        if not signed_url:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Supabase Storage returned no signed URL",
+            )
+        if signed_url.startswith("http"):
+            return signed_url
+        return f"{self.settings.supabase_url}/storage/v1{signed_url}"
+
     async def _get_current_subscription(self, user_id: str) -> dict[str, Any]:
         rows = await self._rest_get(
             "subscriptions",
@@ -216,21 +384,33 @@ class SupabaseGateway:
         return created[0]
 
     async def _rest_get(self, table: str, params: dict[str, str]) -> list[dict[str, Any]]:
-        async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.get(
-                f"{self.settings.supabase_url}/rest/v1/{table}",
-                headers=self._service_headers(),
-                params=params,
-            )
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                response = await client.get(
+                    f"{self.settings.supabase_url}/rest/v1/{table}",
+                    headers=self._service_headers(),
+                    params=params,
+                )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Supabase database is unreachable: {exc.__class__.__name__}",
+            ) from exc
         return self._parse_rest_response(response)
 
     async def _rest_post(self, table: str, body: dict[str, Any]) -> list[dict[str, Any]]:
-        async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.post(
-                f"{self.settings.supabase_url}/rest/v1/{table}",
-                headers=self._service_headers({"Prefer": "return=representation"}),
-                json=body,
-            )
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                response = await client.post(
+                    f"{self.settings.supabase_url}/rest/v1/{table}",
+                    headers=self._service_headers({"Prefer": "return=representation"}),
+                    json=body,
+                )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Supabase database is unreachable: {exc.__class__.__name__}",
+            ) from exc
         return self._parse_rest_response(response)
 
     async def _rest_patch(
@@ -249,12 +429,29 @@ class SupabaseGateway:
             )
         return self._parse_rest_response(response)
 
+    async def _rest_delete(self, table: str, params: dict[str, str]) -> None:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.delete(
+                f"{self.settings.supabase_url}/rest/v1/{table}",
+                headers=self._service_headers(),
+                params=params,
+            )
+        if response.status_code >= 400:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Supabase database delete failed",
+            )
+
     @staticmethod
     def _parse_rest_response(response: httpx.Response) -> list[dict[str, Any]]:
         if response.status_code >= 400:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Supabase database request failed",
+                detail={
+                    "message": "Supabase database request failed",
+                    "status_code": response.status_code,
+                    "provider_response": response.text[:1000],
+                },
             )
         return response.json()
 
