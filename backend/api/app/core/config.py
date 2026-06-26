@@ -35,6 +35,7 @@ class Settings:
     gemini_model: str
     storage_bucket: str
     max_upload_size_bytes: int
+    max_analysis_file_size_bytes: int
 
 
 @lru_cache
@@ -50,6 +51,7 @@ def get_settings() -> Settings:
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         storage_bucket=os.getenv("SUPABASE_STORAGE_BUCKET", "study-files"),
         max_upload_size_bytes=_int_env("MAX_UPLOAD_SIZE_BYTES", 26214400),
+        max_analysis_file_size_bytes=_int_env("MAX_ANALYSIS_FILE_SIZE_BYTES", 10485760),
     )
 
 

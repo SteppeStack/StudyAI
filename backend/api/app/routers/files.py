@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, File, Response, UploadFile, status
 
 from app.dependencies.auth import get_current_user
 from app.schemas.auth import CurrentUser
-from app.schemas.files import SignedUrlResponse, UserFileResponse
+from app.schemas.files import FileAnalysisRequest, FileAnalysisResponse, SignedUrlResponse, UserFileResponse
+from app.services.gemini import GeminiProvider, get_gemini_provider
 from app.services.files import FilesService
 from app.services.supabase import SupabaseGateway, get_supabase_gateway
 
@@ -11,8 +12,9 @@ router = APIRouter(prefix="/api/v1/files", tags=["files"])
 
 def get_files_service(
     supabase: SupabaseGateway = Depends(get_supabase_gateway),
+    gemini: GeminiProvider = Depends(get_gemini_provider),
 ) -> FilesService:
-    return FilesService(supabase=supabase)
+    return FilesService(supabase=supabase, gemini=gemini)
 
 
 @router.post("/upload", response_model=UserFileResponse, status_code=status.HTTP_201_CREATED)
@@ -53,4 +55,19 @@ async def create_signed_url(
         user=user,
         file_id=file_id,
         expires_in=expires_in,
+    )
+
+
+@router.post("/{file_id}/analyze", response_model=FileAnalysisResponse)
+async def analyze_file(
+    file_id: str,
+    payload: FileAnalysisRequest,
+    user: CurrentUser = Depends(get_current_user),
+    service: FilesService = Depends(get_files_service),
+) -> FileAnalysisResponse:
+    return await service.analyze_file(
+        user=user,
+        file_id=file_id,
+        action=payload.action,
+        question=payload.question,
     )

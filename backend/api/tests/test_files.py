@@ -4,7 +4,7 @@ from app.dependencies.auth import get_current_user
 from app.main import app
 from app.routers.files import get_files_service
 from app.schemas.auth import CurrentUser
-from app.schemas.files import SignedUrlResponse, UserFileResponse
+from app.schemas.files import FileAnalysisResponse, SignedUrlResponse, UserFileResponse
 
 
 class FakeFilesService:
@@ -48,6 +48,21 @@ class FakeFilesService:
         return SignedUrlResponse(
             signed_url="https://example.com/signed",
             expires_in=expires_in,
+        )
+
+    async def analyze_file(
+        self,
+        user: CurrentUser,
+        file_id: str,
+        action: str,
+        question: str | None,
+    ) -> FileAnalysisResponse:
+        return FileAnalysisResponse(
+            file_id=file_id,
+            action=action,
+            result="Summary result",
+            ai_requests_used=2,
+            monthly_ai_request_limit=300,
         )
 
 
@@ -98,3 +113,18 @@ def test_signed_url_returns_url() -> None:
 
     assert response.status_code == 200
     assert response.json()["signed_url"] == "https://example.com/signed"
+
+
+def test_analyze_file_returns_ai_result() -> None:
+    _override_dependencies()
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/files/file-1/analyze",
+        json={"action": "summarize", "question": None},
+    )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["result"] == "Summary result"
