@@ -84,6 +84,60 @@ DELETE /api/v1/files/{file_id}
 
 Deletes the object from Supabase Storage and removes the metadata row.
 
+## Analyze File
+
+```http
+POST /api/v1/files/{file_id}/analyze
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "action": "summarize",
+  "question": null
+}
+```
+
+Supported actions:
+
+- `summarize`
+- `key_points`
+- `flashcards`
+- `quiz`
+- `ask`
+- `create_notes`
+
+For `ask`, send a question:
+
+```json
+{
+  "action": "ask",
+  "question": "What are the main arguments in this file?"
+}
+```
+
+Response:
+
+```json
+{
+  "file_id": "file-id",
+  "action": "summarize",
+  "result": "AI generated result",
+  "ai_requests_used": 3,
+  "monthly_ai_request_limit": 300
+}
+```
+
+The backend checks subscription usage limits before calling Gemini.
+
+Analysis support:
+
+- `PDF` and images are sent to Gemini as file input.
+- `DOCX` and `TXT` are converted to text on the backend before calling Gemini.
+- legacy `DOC` files can be uploaded, listed, downloaded, and deleted, but AI analysis is not supported yet.
+
 ## Frontend Tasks
 
 - Use `POST /api/v1/files/upload` for the Files page upload.
@@ -91,4 +145,5 @@ Deletes the object from Supabase Storage and removes the metadata row.
 - Show `original_name`, `file_type`, `size_bytes`, `created_at`, and `status`.
 - Use `POST /api/v1/files/{file_id}/signed-url` for preview/download.
 - Use `DELETE /api/v1/files/{file_id}` for delete action.
+- Use `POST /api/v1/files/{file_id}/analyze` for file AI actions.
 - Do not upload files directly from frontend to Supabase Storage unless backend signs the upload later.

@@ -28,6 +28,7 @@ POST /api/v1/files/upload
 GET /api/v1/files
 POST /api/v1/files/{file_id}/signed-url
 DELETE /api/v1/files/{file_id}
+POST /api/v1/files/{file_id}/analyze
 ```
 
 Expected behavior:
@@ -37,3 +38,6 @@ Expected behavior:
 - `GET /api/v1/files` returns only the current user's files;
 - signed URL opens the private file temporarily;
 - delete removes both the storage object and metadata row.
+- analyze returns a Gemini-generated result and increments monthly usage.
+- DOCX analysis should work through backend text extraction.
+- Legacy DOC analysis should return `415` and ask for DOCX, PDF, TXT, or image files.

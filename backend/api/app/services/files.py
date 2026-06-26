@@ -1,12 +1,16 @@
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+from zipfile import BadZipFile, ZipFile
+import xml.etree.ElementTree as ET
 
 from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import Settings, get_settings
 from app.schemas.auth import CurrentUser
-from app.schemas.files import SignedUrlResponse, UserFileResponse
+from app.schemas.files import FileAnalysisAction, FileAnalysisResponse, SignedUrlResponse, UserFileResponse
+from app.services.gemini import GeminiProvider
 from app.services.supabase import SupabaseGateway
 
 
@@ -33,8 +37,14 @@ EXTENSION_TO_TYPE = {
 
 
 class FilesService:
-    def __init__(self, supabase: SupabaseGateway, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        supabase: SupabaseGateway,
+        gemini: GeminiProvider | None = None,
+        settings: Settings | None = None,
+    ) -> None:
         self.supabase = supabase
+        self.gemini = gemini or GeminiProvider()
         self.settings = settings or get_settings()
 
     async def upload_file(self, user: CurrentUser, upload: UploadFile) -> UserFileResponse:
@@ -118,6 +128,156 @@ class FilesService:
             expires_in=expires_in,
         )
         return SignedUrlResponse(signed_url=signed_url, expires_in=expires_in)
+
+    async def analyze_file(
+        self,
+        user: CurrentUser,
+        file_id: str,
+        action: FileAnalysisAction,
+        question: str | None,
+    ) -> FileAnalysisResponse:
+        file_row = await self.supabase.get_user_file(user_id=user.id, file_id=file_id)
+
+        if file_row["size_bytes"] > self.settings.max_analysis_file_size_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="File is too large for AI analysis",
+            )
+
+        if action == "ask" and not question:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Question is required for ask action",
+            )
+
+        usage_context = await self.supabase.get_usage_context(user.id)
+        file_content = await self.supabase.download_storage_object(
+            bucket_id=file_row["bucket_id"],
+            storage_path=file_row["storage_path"],
+        )
+        prompt = self._analysis_prompt(
+            action=action,
+            file_name=file_row["original_name"],
+            question=question,
+        )
+        result = await self._generate_analysis_result(
+            prompt=prompt,
+            file_row=file_row,
+            file_content=file_content,
+        )
+        updated_usage = await self.supabase.increment_ai_usage(
+            usage_id=usage_context["usage"]["id"],
+            current_value=usage_context["usage"]["ai_requests_used"],
+        )
+        await self.supabase.create_activity_event(
+            user_id=user.id,
+            title=f"File analysis: {action}",
+            description=file_row["original_name"][:120],
+            resource_id=file_row["id"],
+            resource_type="user_file",
+            event_type="file_analysis",
+        )
+
+        return FileAnalysisResponse(
+            file_id=file_row["id"],
+            action=action,
+            result=result,
+            ai_requests_used=updated_usage["ai_requests_used"],
+            monthly_ai_request_limit=usage_context["plan"].get("monthly_ai_request_limit"),
+        )
+
+    async def _generate_analysis_result(
+        self,
+        prompt: str,
+        file_row: dict[str, Any],
+        file_content: bytes,
+    ) -> str:
+        file_type = file_row["file_type"]
+        if file_type == "docx":
+            text = self._extract_docx_text(file_content)
+            return await self.gemini.generate_text(self._text_file_prompt(prompt, text))
+
+        if file_type == "txt":
+            text = self._decode_text_file(file_content)
+            return await self.gemini.generate_text(self._text_file_prompt(prompt, text))
+
+        if file_type == "doc":
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="DOC analysis is not supported yet. Please upload DOCX, PDF, TXT, or image files.",
+            )
+
+        return await self.gemini.generate_text_from_file(
+            prompt=prompt,
+            content=file_content,
+            mime_type=file_row.get("content_type") or "application/octet-stream",
+        )
+
+    @staticmethod
+    def _text_file_prompt(prompt: str, text: str) -> str:
+        return f"{prompt}\n\nExtracted file text:\n{text}"
+
+    @staticmethod
+    def _decode_text_file(content: bytes) -> str:
+        for encoding in ("utf-8", "utf-16", "cp1251", "latin-1"):
+            try:
+                text = content.decode(encoding).strip()
+                if text:
+                    return text
+            except UnicodeDecodeError:
+                continue
+
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not decode text file",
+        )
+
+    @staticmethod
+    def _extract_docx_text(content: bytes) -> str:
+        try:
+            with ZipFile(BytesIO(content)) as docx:
+                document_xml = docx.read("word/document.xml")
+        except (BadZipFile, KeyError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Could not read DOCX file text",
+            ) from exc
+
+        root = ET.fromstring(document_xml)
+        namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        parts = [
+            node.text
+            for node in root.findall(".//w:t", namespace)
+            if node.text and node.text.strip()
+        ]
+        text = "\n".join(parts).strip()
+        if not text:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="DOCX file does not contain readable text",
+            )
+        return text
+
+    @staticmethod
+    def _analysis_prompt(
+        action: FileAnalysisAction,
+        file_name: str,
+        question: str | None,
+    ) -> str:
+        common = (
+            "You are StudyAI, an academic assistant. Analyze the attached study file. "
+            "Be clear, structured, and useful for learning. "
+            f"File name: {file_name}\n\n"
+        )
+        prompts = {
+            "summarize": "Create a concise academic summary with the main idea and important details.",
+            "key_points": "Extract the key points as a clear bullet list.",
+            "flashcards": "Create useful flashcards. Use the format: Front: ... Back: ...",
+            "quiz": "Create a quiz with questions, answer choices when useful, and correct answers.",
+            "create_notes": "Create organized study notes with headings and bullet points.",
+            "ask": f"Answer this question using only the attached file when possible: {question}",
+        }
+        return common + prompts[action]
 
     @staticmethod
     def _detect_file_type(original_name: str, content_type: str) -> str:

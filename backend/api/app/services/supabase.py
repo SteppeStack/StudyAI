@@ -169,16 +169,18 @@ class SupabaseGateway:
         title: str,
         description: str,
         resource_id: str,
+        resource_type: str = "ai_conversation",
+        event_type: str = "ai_tutor_message",
     ) -> None:
         await self._rest_post(
             "activity_events",
             {
                 "user_id": user_id,
-                "event_type": "ai_tutor_message",
+                "event_type": event_type,
                 "title": title,
                 "description": description,
                 "status": "completed",
-                "resource_type": "ai_conversation",
+                "resource_type": resource_type,
                 "resource_id": resource_id,
             },
         )
@@ -332,6 +334,31 @@ class SupabaseGateway:
         if signed_url.startswith("http"):
             return signed_url
         return f"{self.settings.supabase_url}/storage/v1{signed_url}"
+
+    async def download_storage_object(self, bucket_id: str, storage_path: str) -> bytes:
+        self._require_service_config()
+        headers = {
+            "apikey": self.settings.supabase_service_role_key,
+            "Authorization": f"Bearer {self.settings.supabase_service_role_key}",
+        }
+        async with httpx.AsyncClient(timeout=45) as client:
+            response = await client.get(
+                f"{self.settings.supabase_url}/storage/v1/object/{bucket_id}/{storage_path}",
+                headers=headers,
+            )
+        if response.status_code >= 400:
+            detail: str | dict[str, Any] = "Supabase Storage download failed"
+            if self.settings.app_env != "production":
+                detail = {
+                    "message": detail,
+                    "status_code": response.status_code,
+                    "provider_response": response.text[:1000],
+                }
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=detail,
+            )
+        return response.content
 
     async def _get_current_subscription(self, user_id: str) -> dict[str, Any]:
         rows = await self._rest_get(
