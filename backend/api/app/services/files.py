@@ -1,6 +1,9 @@
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+from zipfile import BadZipFile, ZipFile
+import xml.etree.ElementTree as ET
 
 from fastapi import HTTPException, UploadFile, status
 
@@ -157,10 +160,10 @@ class FilesService:
             file_name=file_row["original_name"],
             question=question,
         )
-        result = await self.gemini.generate_text_from_file(
+        result = await self._generate_analysis_result(
             prompt=prompt,
-            content=file_content,
-            mime_type=file_row.get("content_type") or "application/octet-stream",
+            file_row=file_row,
+            file_content=file_content,
         )
         updated_usage = await self.supabase.increment_ai_usage(
             usage_id=usage_context["usage"]["id"],
@@ -182,6 +185,78 @@ class FilesService:
             ai_requests_used=updated_usage["ai_requests_used"],
             monthly_ai_request_limit=usage_context["plan"].get("monthly_ai_request_limit"),
         )
+
+    async def _generate_analysis_result(
+        self,
+        prompt: str,
+        file_row: dict[str, Any],
+        file_content: bytes,
+    ) -> str:
+        file_type = file_row["file_type"]
+        if file_type == "docx":
+            text = self._extract_docx_text(file_content)
+            return await self.gemini.generate_text(self._text_file_prompt(prompt, text))
+
+        if file_type == "txt":
+            text = self._decode_text_file(file_content)
+            return await self.gemini.generate_text(self._text_file_prompt(prompt, text))
+
+        if file_type == "doc":
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="DOC analysis is not supported yet. Please upload DOCX, PDF, TXT, or image files.",
+            )
+
+        return await self.gemini.generate_text_from_file(
+            prompt=prompt,
+            content=file_content,
+            mime_type=file_row.get("content_type") or "application/octet-stream",
+        )
+
+    @staticmethod
+    def _text_file_prompt(prompt: str, text: str) -> str:
+        return f"{prompt}\n\nExtracted file text:\n{text}"
+
+    @staticmethod
+    def _decode_text_file(content: bytes) -> str:
+        for encoding in ("utf-8", "utf-16", "cp1251", "latin-1"):
+            try:
+                text = content.decode(encoding).strip()
+                if text:
+                    return text
+            except UnicodeDecodeError:
+                continue
+
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not decode text file",
+        )
+
+    @staticmethod
+    def _extract_docx_text(content: bytes) -> str:
+        try:
+            with ZipFile(BytesIO(content)) as docx:
+                document_xml = docx.read("word/document.xml")
+        except (BadZipFile, KeyError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Could not read DOCX file text",
+            ) from exc
+
+        root = ET.fromstring(document_xml)
+        namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        parts = [
+            node.text
+            for node in root.findall(".//w:t", namespace)
+            if node.text and node.text.strip()
+        ]
+        text = "\n".join(parts).strip()
+        if not text:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="DOCX file does not contain readable text",
+            )
+        return text
 
     @staticmethod
     def _analysis_prompt(

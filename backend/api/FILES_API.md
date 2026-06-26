@@ -132,6 +132,12 @@ Response:
 
 The backend checks subscription usage limits before calling Gemini.
 
+Analysis support:
+
+- `PDF` and images are sent to Gemini as file input.
+- `DOCX` and `TXT` are converted to text on the backend before calling Gemini.
+- legacy `DOC` files can be uploaded, listed, downloaded, and deleted, but AI analysis is not supported yet.
+
 ## Frontend Tasks
 
 - Use `POST /api/v1/files/upload` for the Files page upload.
