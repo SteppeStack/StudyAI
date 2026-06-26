@@ -12,6 +12,17 @@ def _list_env(name: str, default: str) -> list[str]:
     return [item.strip() for item in raw_value.split(",") if item.strip()]
 
 
+def _int_env(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if not raw_value:
+        return default
+
+    try:
+        return int(raw_value)
+    except ValueError:
+        return default
+
+
 @dataclass(frozen=True)
 class Settings:
     app_env: str
@@ -22,6 +33,8 @@ class Settings:
     ai_provider: str
     gemini_api_key: str
     gemini_model: str
+    storage_bucket: str
+    max_upload_size_bytes: int
 
 
 @lru_cache
@@ -35,6 +48,8 @@ def get_settings() -> Settings:
         ai_provider=os.getenv("AI_PROVIDER", "gemini"),
         gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        storage_bucket=os.getenv("SUPABASE_STORAGE_BUCKET", "study-files"),
+        max_upload_size_bytes=_int_env("MAX_UPLOAD_SIZE_BYTES", 26214400),
     )
 
 

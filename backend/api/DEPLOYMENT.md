@@ -29,6 +29,8 @@ SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
 AI_PROVIDER=gemini
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 GEMINI_MODEL=gemini-2.5-flash
+SUPABASE_STORAGE_BUCKET=study-files
+MAX_UPLOAD_SIZE_BYTES=26214400
 ```
 
 Use comma-separated origins if you need both production and local frontend:

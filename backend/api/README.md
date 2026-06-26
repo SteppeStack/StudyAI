@@ -9,6 +9,7 @@ It does not replace Supabase Auth or the Supabase database in Sprint 1. The fron
 - FastAPI application
 - Health endpoint: `GET /health`
 - AI Tutor endpoint: `POST /api/v1/ai/chat`
+- Files endpoints: `POST /api/v1/files/upload`, `GET /api/v1/files`
 - Interactive Swagger UI: `/docs`
 - CORS for the future Next.js frontend
 - Automated tests for health and AI route structure
@@ -81,6 +82,8 @@ GEMINI_MODEL=gemini-2.5-flash
 ## Frontend Contract
 
 See `AI_CHAT_API.md`.
+
+See `FILES_API.md` for the Files Workspace upload/list/delete contract.
 
 After this endpoint is deployed, the frontend should call `POST /api/v1/ai/chat` for AI Tutor messages instead of inserting `ai_messages` directly. The API saves both the user message and the Gemini assistant response.
 
