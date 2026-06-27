@@ -33,6 +33,7 @@ class Settings:
     ai_provider: str
     gemini_api_key: str
     gemini_model: str
+    gemini_model_chain: list[str]
     storage_bucket: str
     max_upload_size_bytes: int
     max_analysis_file_size_bytes: int
@@ -51,6 +52,10 @@ def get_settings() -> Settings:
         ai_provider=os.getenv("AI_PROVIDER", "gemini"),
         gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        gemini_model_chain=_list_env(
+            "GEMINI_MODEL_CHAIN",
+            "gemini-2.5-flash-lite,gemini-2.0-flash,gemini-2.5-flash",
+        ),
         storage_bucket=os.getenv("SUPABASE_STORAGE_BUCKET", "study-files"),
         max_upload_size_bytes=_int_env("MAX_UPLOAD_SIZE_BYTES", 26214400),
         max_analysis_file_size_bytes=_int_env("MAX_ANALYSIS_FILE_SIZE_BYTES", 10485760),
