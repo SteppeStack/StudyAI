@@ -60,5 +60,7 @@ class AssignmentGenerateResponse(BaseModel):
     assignment: AssignmentResponse
     action: AssignmentHelpType
     result: str
+    model_used: str | None = None
+    fallback_used: bool = False
     ai_requests_used: int
     monthly_ai_request_limit: int | None = None

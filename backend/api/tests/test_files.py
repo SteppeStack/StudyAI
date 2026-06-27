@@ -56,11 +56,19 @@ class FakeFilesService:
         file_id: str,
         action: str,
         question: str | None,
+        response_mode: str,
+        force_refresh: bool,
     ) -> FileAnalysisResponse:
         return FileAnalysisResponse(
             file_id=file_id,
             action=action,
+            response_mode=response_mode,
             result="Summary result",
+            cached=False,
+            was_truncated=False,
+            input_chars_used=100,
+            model_used="gemini-2.5-flash-lite",
+            fallback_used=False,
             ai_requests_used=2,
             monthly_ai_request_limit=300,
         )

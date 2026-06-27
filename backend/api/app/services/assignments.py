@@ -88,8 +88,8 @@ class AssignmentsService:
             )
 
         usage_context = await self.supabase.get_usage_context(user.id)
-        result = await self.gemini.generate_text(self._build_prompt(assignment, action))
-        update_data = self._ai_result_update(action, result)
+        ai_result = await self.gemini.generate_text_result(self._build_prompt(assignment, action))
+        update_data = self._ai_result_update(action, ai_result.text)
         updated = await self.supabase.update_assignment(
             user_id=user.id,
             assignment_id=assignment_id,
@@ -111,7 +111,9 @@ class AssignmentsService:
         return AssignmentGenerateResponse(
             assignment=self._assignment_response(updated),
             action=action,
-            result=result,
+            result=ai_result.text,
+            model_used=ai_result.model_used,
+            fallback_used=ai_result.fallback_used,
             ai_requests_used=updated_usage["ai_requests_used"],
             monthly_ai_request_limit=usage_context["plan"].get("monthly_ai_request_limit"),
         )

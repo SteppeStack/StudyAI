@@ -89,6 +89,15 @@ For `answer_check`, the assignment must have `student_answer`.
 
 The backend checks subscription usage limits before calling Gemini.
 
+Generation responses include:
+
+```json
+{
+  "model_used": "gemini-2.5-flash-lite",
+  "fallback_used": false
+}
+```
+
 ## Frontend Tasks
 
 - Use `POST /api/v1/assignments` for creating assignments.

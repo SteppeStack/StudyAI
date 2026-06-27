@@ -2,14 +2,21 @@ from typing import Any
 
 from app.schemas.ai import AIChatResponse, AIMessageResponse, UsageResponse
 from app.schemas.auth import CurrentUser
+from app.core.config import Settings, get_settings
 from app.services.gemini import GeminiProvider
 from app.services.supabase import SupabaseGateway
 
 
 class AIChatService:
-    def __init__(self, supabase: SupabaseGateway, provider: GeminiProvider) -> None:
+    def __init__(
+        self,
+        supabase: SupabaseGateway,
+        provider: GeminiProvider,
+        settings: Settings | None = None,
+    ) -> None:
         self.supabase = supabase
         self.provider = provider
+        self.settings = settings or get_settings()
 
     async def send_message(
         self,
@@ -28,7 +35,10 @@ class AIChatService:
         )
 
         usage_context = await self.supabase.get_usage_context(user.id)
-        recent_messages = await self.supabase.get_recent_messages(conversation["id"])
+        recent_messages = await self.supabase.get_recent_messages(
+            conversation["id"],
+            limit=self.settings.ai_tutor_history_limit,
+        )
         user_message = await self.supabase.insert_ai_message(
             conversation_id=conversation["id"],
             user_id=user.id,
@@ -36,14 +46,18 @@ class AIChatService:
             content=clean_message,
         )
 
-        prompt = self._build_prompt(clean_message, list(reversed(recent_messages)))
-        assistant_text = await self.provider.generate_text(prompt)
+        prompt = self._build_prompt(
+            clean_message,
+            list(reversed(recent_messages)),
+            self.settings.ai_tutor_history_limit,
+        )
+        ai_result = await self.provider.generate_text_result(prompt)
 
         assistant_message = await self.supabase.insert_ai_message(
             conversation_id=conversation["id"],
             user_id=user.id,
             role="assistant",
-            content=assistant_text,
+            content=ai_result.text,
         )
         updated_usage = await self.supabase.increment_ai_usage(
             usage_id=usage_context["usage"]["id"],
@@ -64,12 +78,18 @@ class AIChatService:
                 ai_requests_used=updated_usage["ai_requests_used"],
                 monthly_ai_request_limit=usage_context["plan"].get("monthly_ai_request_limit"),
             ),
+            model_used=ai_result.model_used,
+            fallback_used=ai_result.fallback_used,
         )
 
     @staticmethod
-    def _build_prompt(message: str, recent_messages: list[dict[str, Any]]) -> str:
+    def _build_prompt(
+        message: str,
+        recent_messages: list[dict[str, Any]],
+        history_limit: int,
+    ) -> str:
         history = "\n".join(
-            f"{item['role']}: {item['content']}" for item in recent_messages[-12:]
+            f"{item['role']}: {item['content']}" for item in recent_messages[-history_limit:]
         )
         return (
             "You are StudyAI, an academic AI tutor. "
