@@ -24,3 +24,5 @@ class AIChatResponse(BaseModel):
     user_message: AIMessageResponse
     assistant_message: AIMessageResponse
     usage: UsageResponse
+    model_used: str | None = None
+    fallback_used: bool = False
