@@ -421,6 +421,58 @@ class SupabaseGateway:
             },
         )
 
+    async def get_file_analysis_result(
+        self,
+        user_id: str,
+        file_id: str,
+        action: str,
+        question: str | None,
+        response_mode: str,
+    ) -> dict[str, Any] | None:
+        params = {
+            "user_id": f"eq.{user_id}",
+            "file_id": f"eq.{file_id}",
+            "action": f"eq.{action}",
+            "response_mode": f"eq.{response_mode}",
+            "select": "*",
+            "limit": "1",
+        }
+        if question:
+            params["question"] = f"eq.{question}"
+        else:
+            params["question"] = "is.null"
+
+        rows = await self._rest_get("file_analysis_results", params)
+        return rows[0] if rows else None
+
+    async def insert_file_analysis_result(
+        self,
+        user_id: str,
+        file_id: str,
+        action: str,
+        question: str | None,
+        response_mode: str,
+        result: str,
+        source_size_bytes: int,
+        input_chars_used: int | None,
+        was_truncated: bool,
+    ) -> dict[str, Any]:
+        created = await self._rest_post(
+            "file_analysis_results",
+            {
+                "user_id": user_id,
+                "file_id": file_id,
+                "action": action,
+                "question": question,
+                "response_mode": response_mode,
+                "result": result,
+                "source_size_bytes": source_size_bytes,
+                "input_chars_used": input_chars_used,
+                "was_truncated": was_truncated,
+            },
+        )
+        return created[0]
+
     async def _get_current_subscription(self, user_id: str) -> dict[str, Any]:
         rows = await self._rest_get(
             "subscriptions",

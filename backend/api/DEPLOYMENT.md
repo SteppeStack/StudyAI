@@ -32,6 +32,8 @@ GEMINI_MODEL=gemini-2.5-flash
 SUPABASE_STORAGE_BUCKET=study-files
 MAX_UPLOAD_SIZE_BYTES=26214400
 MAX_ANALYSIS_FILE_SIZE_BYTES=10485760
+MAX_AI_INPUT_CHARS=30000
+AI_TUTOR_HISTORY_LIMIT=8
 ```
 
 Use comma-separated origins if you need both production and local frontend:

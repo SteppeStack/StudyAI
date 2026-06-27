@@ -96,7 +96,8 @@ Body:
 ```json
 {
   "action": "summarize",
-  "question": null
+  "question": null,
+  "response_mode": "normal"
 }
 ```
 
@@ -114,9 +115,16 @@ For `ask`, send a question:
 ```json
 {
   "action": "ask",
-  "question": "What are the main arguments in this file?"
+  "question": "What are the main arguments in this file?",
+  "response_mode": "short"
 }
 ```
+
+Response modes:
+
+- `short`
+- `normal`
+- `detailed`
 
 Response:
 
@@ -124,13 +132,19 @@ Response:
 {
   "file_id": "file-id",
   "action": "summarize",
+  "response_mode": "normal",
   "result": "AI generated result",
+  "cached": false,
+  "was_truncated": false,
+  "input_chars_used": 12000,
   "ai_requests_used": 3,
   "monthly_ai_request_limit": 300
 }
 ```
 
 The backend checks subscription usage limits before calling Gemini.
+Repeated requests with the same `file_id`, `action`, `question`, and `response_mode`
+return the cached result without calling Gemini again.
 
 Analysis support:
 
@@ -146,4 +160,5 @@ Analysis support:
 - Use `POST /api/v1/files/{file_id}/signed-url` for preview/download.
 - Use `DELETE /api/v1/files/{file_id}` for delete action.
 - Use `POST /api/v1/files/{file_id}/analyze` for file AI actions.
+- Use `response_mode` to control token usage and result length.
 - Do not upload files directly from frontend to Supabase Storage unless backend signs the upload later.

@@ -9,7 +9,13 @@ from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import Settings, get_settings
 from app.schemas.auth import CurrentUser
-from app.schemas.files import FileAnalysisAction, FileAnalysisResponse, SignedUrlResponse, UserFileResponse
+from app.schemas.files import (
+    FileAnalysisAction,
+    FileAnalysisResponse,
+    FileAnalysisResponseMode,
+    SignedUrlResponse,
+    UserFileResponse,
+)
 from app.services.gemini import GeminiProvider
 from app.services.supabase import SupabaseGateway
 
@@ -135,6 +141,7 @@ class FilesService:
         file_id: str,
         action: FileAnalysisAction,
         question: str | None,
+        response_mode: FileAnalysisResponseMode,
     ) -> FileAnalysisResponse:
         file_row = await self.supabase.get_user_file(user_id=user.id, file_id=file_id)
 
@@ -151,6 +158,26 @@ class FilesService:
             )
 
         usage_context = await self.supabase.get_usage_context(user.id)
+        cached = await self.supabase.get_file_analysis_result(
+            user_id=user.id,
+            file_id=file_id,
+            action=action,
+            question=question,
+            response_mode=response_mode,
+        )
+        if cached:
+            return FileAnalysisResponse(
+                file_id=file_row["id"],
+                action=action,
+                response_mode=response_mode,
+                result=cached["result"],
+                cached=True,
+                was_truncated=cached["was_truncated"],
+                input_chars_used=cached.get("input_chars_used"),
+                ai_requests_used=usage_context["usage"]["ai_requests_used"],
+                monthly_ai_request_limit=usage_context["plan"].get("monthly_ai_request_limit"),
+            )
+
         file_content = await self.supabase.download_storage_object(
             bucket_id=file_row["bucket_id"],
             storage_path=file_row["storage_path"],
@@ -159,8 +186,9 @@ class FilesService:
             action=action,
             file_name=file_row["original_name"],
             question=question,
+            response_mode=response_mode,
         )
-        result = await self._generate_analysis_result(
+        result, metadata = await self._generate_analysis_result(
             prompt=prompt,
             file_row=file_row,
             file_content=file_content,
@@ -168,6 +196,17 @@ class FilesService:
         updated_usage = await self.supabase.increment_ai_usage(
             usage_id=usage_context["usage"]["id"],
             current_value=usage_context["usage"]["ai_requests_used"],
+        )
+        await self.supabase.insert_file_analysis_result(
+            user_id=user.id,
+            file_id=file_row["id"],
+            action=action,
+            question=question,
+            response_mode=response_mode,
+            result=result,
+            source_size_bytes=file_row["size_bytes"],
+            input_chars_used=metadata.get("input_chars_used"),
+            was_truncated=metadata["was_truncated"],
         )
         await self.supabase.create_activity_event(
             user_id=user.id,
@@ -181,7 +220,11 @@ class FilesService:
         return FileAnalysisResponse(
             file_id=file_row["id"],
             action=action,
+            response_mode=response_mode,
             result=result,
+            cached=False,
+            was_truncated=metadata["was_truncated"],
+            input_chars_used=metadata.get("input_chars_used"),
             ai_requests_used=updated_usage["ai_requests_used"],
             monthly_ai_request_limit=usage_context["plan"].get("monthly_ai_request_limit"),
         )
@@ -191,15 +234,25 @@ class FilesService:
         prompt: str,
         file_row: dict[str, Any],
         file_content: bytes,
-    ) -> str:
+    ) -> tuple[str, dict[str, Any]]:
         file_type = file_row["file_type"]
         if file_type == "docx":
             text = self._extract_docx_text(file_content)
-            return await self.gemini.generate_text(self._text_file_prompt(prompt, text))
+            limited_text, was_truncated = self._limit_text(text)
+            result = await self.gemini.generate_text(self._text_file_prompt(prompt, limited_text, was_truncated))
+            return result, {
+                "input_chars_used": len(limited_text),
+                "was_truncated": was_truncated,
+            }
 
         if file_type == "txt":
             text = self._decode_text_file(file_content)
-            return await self.gemini.generate_text(self._text_file_prompt(prompt, text))
+            limited_text, was_truncated = self._limit_text(text)
+            result = await self.gemini.generate_text(self._text_file_prompt(prompt, limited_text, was_truncated))
+            return result, {
+                "input_chars_used": len(limited_text),
+                "was_truncated": was_truncated,
+            }
 
         if file_type == "doc":
             raise HTTPException(
@@ -207,15 +260,30 @@ class FilesService:
                 detail="DOC analysis is not supported yet. Please upload DOCX, PDF, TXT, or image files.",
             )
 
-        return await self.gemini.generate_text_from_file(
+        result = await self.gemini.generate_text_from_file(
             prompt=prompt,
             content=file_content,
             mime_type=file_row.get("content_type") or "application/octet-stream",
         )
+        return result, {
+            "input_chars_used": None,
+            "was_truncated": False,
+        }
 
     @staticmethod
-    def _text_file_prompt(prompt: str, text: str) -> str:
-        return f"{prompt}\n\nExtracted file text:\n{text}"
+    def _text_file_prompt(prompt: str, text: str, was_truncated: bool) -> str:
+        truncation_note = (
+            "\n\nNote: The extracted file text was truncated to reduce AI token usage."
+            if was_truncated
+            else ""
+        )
+        return f"{prompt}{truncation_note}\n\nExtracted file text:\n{text}"
+
+    def _limit_text(self, text: str) -> tuple[str, bool]:
+        normalized = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+        if len(normalized) <= self.settings.max_ai_input_chars:
+            return normalized, False
+        return normalized[: self.settings.max_ai_input_chars], True
 
     @staticmethod
     def _decode_text_file(content: bytes) -> str:
@@ -263,11 +331,18 @@ class FilesService:
         action: FileAnalysisAction,
         file_name: str,
         question: str | None,
+        response_mode: FileAnalysisResponseMode,
     ) -> str:
+        mode_instructions = {
+            "short": "Keep the answer concise. Prefer short bullets and no long explanations.",
+            "normal": "Use a balanced amount of detail.",
+            "detailed": "Give a detailed and structured answer, but stay focused on the file.",
+        }
         common = (
             "You are StudyAI, an academic assistant. Analyze the attached study file. "
             "Be clear, structured, and useful for learning. "
-            f"File name: {file_name}\n\n"
+            f"File name: {file_name}\n"
+            f"Response mode: {response_mode}. {mode_instructions[response_mode]}\n\n"
         )
         prompts = {
             "summarize": "Create a concise academic summary with the main idea and important details.",

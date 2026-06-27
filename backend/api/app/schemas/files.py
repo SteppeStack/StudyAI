@@ -30,15 +30,22 @@ FileAnalysisAction = Literal[
     "create_notes",
 ]
 
+FileAnalysisResponseMode = Literal["short", "normal", "detailed"]
+
 
 class FileAnalysisRequest(BaseModel):
     action: FileAnalysisAction
     question: str | None = None
+    response_mode: FileAnalysisResponseMode = "normal"
 
 
 class FileAnalysisResponse(BaseModel):
     file_id: str
     action: FileAnalysisAction
+    response_mode: FileAnalysisResponseMode
     result: str
+    cached: bool = False
+    was_truncated: bool = False
+    input_chars_used: int | None = None
     ai_requests_used: int
     monthly_ai_request_limit: int | None = None

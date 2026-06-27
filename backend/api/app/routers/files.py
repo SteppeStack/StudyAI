@@ -70,4 +70,5 @@ async def analyze_file(
         file_id=file_id,
         action=payload.action,
         question=payload.question,
+        response_mode=payload.response_mode,
     )
