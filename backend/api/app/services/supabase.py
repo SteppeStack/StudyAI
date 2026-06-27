@@ -360,6 +360,67 @@ class SupabaseGateway:
             )
         return response.content
 
+    async def insert_assignment(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        created = await self._rest_post("assignments", {"user_id": user_id, **data})
+        return created[0]
+
+    async def list_assignments(self, user_id: str) -> list[dict[str, Any]]:
+        return await self._rest_get(
+            "assignments",
+            {
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "order": "updated_at.desc",
+            },
+        )
+
+    async def get_assignment(self, user_id: str, assignment_id: str) -> dict[str, Any]:
+        rows = await self._rest_get(
+            "assignments",
+            {
+                "id": f"eq.{assignment_id}",
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "limit": "1",
+            },
+        )
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assignment not found",
+            )
+        return rows[0]
+
+    async def update_assignment(
+        self,
+        user_id: str,
+        assignment_id: str,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+        updated = await self._rest_patch(
+            "assignments",
+            {
+                "id": f"eq.{assignment_id}",
+                "user_id": f"eq.{user_id}",
+            },
+            data,
+        )
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Assignment not found",
+            )
+        return updated[0]
+
+    async def delete_assignment(self, user_id: str, assignment_id: str) -> None:
+        await self._rest_delete(
+            "assignments",
+            {
+                "id": f"eq.{assignment_id}",
+                "user_id": f"eq.{user_id}",
+            },
+        )
+
     async def _get_current_subscription(self, user_id: str) -> dict[str, Any]:
         rows = await self._rest_get(
             "subscriptions",
