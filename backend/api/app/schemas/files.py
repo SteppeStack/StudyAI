@@ -37,6 +37,7 @@ class FileAnalysisRequest(BaseModel):
     action: FileAnalysisAction
     question: str | None = None
     response_mode: FileAnalysisResponseMode = "normal"
+    force_refresh: bool = False
 
 
 class FileAnalysisResponse(BaseModel):
@@ -47,5 +48,7 @@ class FileAnalysisResponse(BaseModel):
     cached: bool = False
     was_truncated: bool = False
     input_chars_used: int | None = None
+    model_used: str | None = None
+    fallback_used: bool = False
     ai_requests_used: int
     monthly_ai_request_limit: int | None = None

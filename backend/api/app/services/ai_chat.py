@@ -51,13 +51,13 @@ class AIChatService:
             list(reversed(recent_messages)),
             self.settings.ai_tutor_history_limit,
         )
-        assistant_text = await self.provider.generate_text(prompt)
+        ai_result = await self.provider.generate_text_result(prompt)
 
         assistant_message = await self.supabase.insert_ai_message(
             conversation_id=conversation["id"],
             user_id=user.id,
             role="assistant",
-            content=assistant_text,
+            content=ai_result.text,
         )
         updated_usage = await self.supabase.increment_ai_usage(
             usage_id=usage_context["usage"]["id"],
@@ -78,6 +78,8 @@ class AIChatService:
                 ai_requests_used=updated_usage["ai_requests_used"],
                 monthly_ai_request_limit=usage_context["plan"].get("monthly_ai_request_limit"),
             ),
+            model_used=ai_result.model_used,
+            fallback_used=ai_result.fallback_used,
         )
 
     @staticmethod

@@ -52,6 +52,8 @@ class FakeAssignmentsService:
             assignment=item,
             action=action,
             result="AI plan",
+            model_used="gemini-2.5-flash-lite",
+            fallback_used=False,
             ai_requests_used=1,
             monthly_ai_request_limit=300,
         )

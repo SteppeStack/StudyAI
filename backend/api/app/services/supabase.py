@@ -456,6 +456,8 @@ class SupabaseGateway:
         source_size_bytes: int,
         input_chars_used: int | None,
         was_truncated: bool,
+        model_used: str | None,
+        fallback_used: bool,
     ) -> dict[str, Any]:
         created = await self._rest_post(
             "file_analysis_results",
@@ -469,6 +471,8 @@ class SupabaseGateway:
                 "source_size_bytes": source_size_bytes,
                 "input_chars_used": input_chars_used,
                 "was_truncated": was_truncated,
+                "model_used": model_used,
+                "fallback_used": fallback_used,
             },
         )
         return created[0]

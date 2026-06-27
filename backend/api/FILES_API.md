@@ -137,6 +137,8 @@ Response:
   "cached": false,
   "was_truncated": false,
   "input_chars_used": 12000,
+  "model_used": "gemini-2.5-flash-lite",
+  "fallback_used": false,
   "ai_requests_used": 3,
   "monthly_ai_request_limit": 300
 }
@@ -145,6 +147,17 @@ Response:
 The backend checks subscription usage limits before calling Gemini.
 Repeated requests with the same `file_id`, `action`, `question`, and `response_mode`
 return the cached result without calling Gemini again.
+
+Set `force_refresh` to `true` to bypass the cache:
+
+```json
+{
+  "action": "summarize",
+  "question": null,
+  "response_mode": "short",
+  "force_refresh": true
+}
+```
 
 Analysis support:
 

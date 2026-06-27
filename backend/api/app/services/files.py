@@ -142,6 +142,7 @@ class FilesService:
         action: FileAnalysisAction,
         question: str | None,
         response_mode: FileAnalysisResponseMode,
+        force_refresh: bool,
     ) -> FileAnalysisResponse:
         file_row = await self.supabase.get_user_file(user_id=user.id, file_id=file_id)
 
@@ -158,13 +159,15 @@ class FilesService:
             )
 
         usage_context = await self.supabase.get_usage_context(user.id)
-        cached = await self.supabase.get_file_analysis_result(
-            user_id=user.id,
-            file_id=file_id,
-            action=action,
-            question=question,
-            response_mode=response_mode,
-        )
+        cached = None
+        if not force_refresh:
+            cached = await self.supabase.get_file_analysis_result(
+                user_id=user.id,
+                file_id=file_id,
+                action=action,
+                question=question,
+                response_mode=response_mode,
+            )
         if cached:
             return FileAnalysisResponse(
                 file_id=file_row["id"],
@@ -174,6 +177,8 @@ class FilesService:
                 cached=True,
                 was_truncated=cached["was_truncated"],
                 input_chars_used=cached.get("input_chars_used"),
+                model_used=cached.get("model_used"),
+                fallback_used=cached.get("fallback_used") or False,
                 ai_requests_used=usage_context["usage"]["ai_requests_used"],
                 monthly_ai_request_limit=usage_context["plan"].get("monthly_ai_request_limit"),
             )
@@ -207,6 +212,8 @@ class FilesService:
             source_size_bytes=file_row["size_bytes"],
             input_chars_used=metadata.get("input_chars_used"),
             was_truncated=metadata["was_truncated"],
+            model_used=metadata.get("model_used"),
+            fallback_used=metadata["fallback_used"],
         )
         await self.supabase.create_activity_event(
             user_id=user.id,
@@ -225,6 +232,8 @@ class FilesService:
             cached=False,
             was_truncated=metadata["was_truncated"],
             input_chars_used=metadata.get("input_chars_used"),
+            model_used=metadata.get("model_used"),
+            fallback_used=metadata["fallback_used"],
             ai_requests_used=updated_usage["ai_requests_used"],
             monthly_ai_request_limit=usage_context["plan"].get("monthly_ai_request_limit"),
         )
@@ -239,19 +248,27 @@ class FilesService:
         if file_type == "docx":
             text = self._extract_docx_text(file_content)
             limited_text, was_truncated = self._limit_text(text)
-            result = await self.gemini.generate_text(self._text_file_prompt(prompt, limited_text, was_truncated))
-            return result, {
+            result = await self.gemini.generate_text_result(
+                self._text_file_prompt(prompt, limited_text, was_truncated)
+            )
+            return result.text, {
                 "input_chars_used": len(limited_text),
                 "was_truncated": was_truncated,
+                "model_used": result.model_used,
+                "fallback_used": result.fallback_used,
             }
 
         if file_type == "txt":
             text = self._decode_text_file(file_content)
             limited_text, was_truncated = self._limit_text(text)
-            result = await self.gemini.generate_text(self._text_file_prompt(prompt, limited_text, was_truncated))
-            return result, {
+            result = await self.gemini.generate_text_result(
+                self._text_file_prompt(prompt, limited_text, was_truncated)
+            )
+            return result.text, {
                 "input_chars_used": len(limited_text),
                 "was_truncated": was_truncated,
+                "model_used": result.model_used,
+                "fallback_used": result.fallback_used,
             }
 
         if file_type == "doc":
@@ -260,14 +277,16 @@ class FilesService:
                 detail="DOC analysis is not supported yet. Please upload DOCX, PDF, TXT, or image files.",
             )
 
-        result = await self.gemini.generate_text_from_file(
+        result = await self.gemini.generate_text_from_file_result(
             prompt=prompt,
             content=file_content,
             mime_type=file_row.get("content_type") or "application/octet-stream",
         )
-        return result, {
+        return result.text, {
             "input_chars_used": None,
             "was_truncated": False,
+            "model_used": result.model_used,
+            "fallback_used": result.fallback_used,
         }
 
     @staticmethod

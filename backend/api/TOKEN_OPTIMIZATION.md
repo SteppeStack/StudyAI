@@ -32,6 +32,8 @@ user_id + file_id + action + question + response_mode
 
 Cached responses do not call Gemini again and do not increment monthly usage.
 
+Use `force_refresh: true` to bypass the cache and ask Gemini again.
+
 ## Response Modes
 
 File analysis accepts:
@@ -65,3 +67,12 @@ gemini-2.5-flash
 Fallback is used only for quota/rate-limit style errors, such as `429` or `RESOURCE_EXHAUSTED`.
 
 It is not used for invalid request errors, invalid API keys, unsupported MIME types, or permission problems.
+
+AI responses include:
+
+```json
+{
+  "model_used": "gemini-2.5-flash-lite",
+  "fallback_used": false
+}
+```

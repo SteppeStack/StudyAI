@@ -71,4 +71,5 @@ async def analyze_file(
         action=payload.action,
         question=payload.question,
         response_mode=payload.response_mode,
+        force_refresh=payload.force_refresh,
     )

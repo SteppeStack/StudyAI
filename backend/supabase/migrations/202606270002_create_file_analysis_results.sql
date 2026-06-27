@@ -9,6 +9,8 @@ create table if not exists public.file_analysis_results (
   source_size_bytes bigint not null default 0,
   input_chars_used integer,
   was_truncated boolean not null default false,
+  model_used text,
+  fallback_used boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint file_analysis_results_action_check check (

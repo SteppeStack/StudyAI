@@ -1,4 +1,5 @@
 import base64
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -7,11 +8,29 @@ from fastapi import HTTPException, status
 from app.core.config import Settings, get_settings
 
 
+@dataclass(frozen=True)
+class GeminiResult:
+    text: str
+    model_used: str
+    fallback_used: bool
+
+
+@dataclass(frozen=True)
+class GeminiRawResult:
+    data: dict[str, Any]
+    model_used: str
+    fallback_used: bool
+
+
 class GeminiProvider:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
 
     async def generate_text(self, prompt: str) -> str:
+        result = await self.generate_text_result(prompt)
+        return result.text
+
+    async def generate_text_result(self, prompt: str) -> GeminiResult:
         payload: dict[str, Any] = {
             "contents": [
                 {
@@ -20,8 +39,12 @@ class GeminiProvider:
                 }
             ]
         }
-        data = await self._generate_with_fallback(payload=payload, timeout=45)
-        return self._extract_text(data)
+        raw = await self._generate_with_fallback(payload=payload, timeout=45)
+        return GeminiResult(
+            text=self._extract_text(raw.data),
+            model_used=raw.model_used,
+            fallback_used=raw.fallback_used,
+        )
 
     async def generate_text_from_file(
         self,
@@ -29,6 +52,19 @@ class GeminiProvider:
         content: bytes,
         mime_type: str,
     ) -> str:
+        result = await self.generate_text_from_file_result(
+            prompt=prompt,
+            content=content,
+            mime_type=mime_type,
+        )
+        return result.text
+
+    async def generate_text_from_file_result(
+        self,
+        prompt: str,
+        content: bytes,
+        mime_type: str,
+    ) -> GeminiResult:
         payload: dict[str, Any] = {
             "contents": [
                 {
@@ -45,14 +81,18 @@ class GeminiProvider:
                 }
             ]
         }
-        data = await self._generate_with_fallback(payload=payload, timeout=60)
-        return self._extract_text(data)
+        raw = await self._generate_with_fallback(payload=payload, timeout=60)
+        return GeminiResult(
+            text=self._extract_text(raw.data),
+            model_used=raw.model_used,
+            fallback_used=raw.fallback_used,
+        )
 
     async def _generate_with_fallback(
         self,
         payload: dict[str, Any],
         timeout: int,
-    ) -> dict[str, Any]:
+    ) -> GeminiRawResult:
         if self.settings.ai_provider != "gemini":
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -70,14 +110,20 @@ class GeminiProvider:
         params = {"key": self.settings.gemini_api_key}
 
         async with httpx.AsyncClient(timeout=timeout) as client:
+            attempt_index = 0
             for model in model_chain:
+                attempt_index += 1
                 url = (
                     "https://generativelanguage.googleapis.com/v1beta/models/"
                     f"{model}:generateContent"
                 )
                 response = await client.post(url, params=params, json=payload)
                 if response.status_code < 400:
-                    return response.json()
+                    return GeminiRawResult(
+                        data=response.json(),
+                        model_used=model,
+                        fallback_used=attempt_index > 1,
+                    )
 
                 responses.append(
                     {
