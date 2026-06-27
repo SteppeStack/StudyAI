@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { sendAiTutorMessage } from "@/lib/studyApi";
 
 export type Conversation = {
   id: string;
@@ -48,14 +49,23 @@ export async function sendUserMessage(
   userId: string,
   content: string
 ) {
-  return await supabase
-    .from("ai_messages")
-    .insert({
+  const response = await sendAiTutorMessage({
+    conversation_id: conversationId,
+    message: content,
+  });
+
+  return {
+    data: {
       conversation_id: conversationId,
       user_id: userId,
-      role: "user",
-      content,
-    })
-    .select()
-    .single();
+      ...response.user_message,
+    },
+    assistantMessage: {
+      conversation_id: conversationId,
+      user_id: userId,
+      ...response.assistant_message,
+    },
+    usage: response.usage,
+    error: null,
+  };
 }

@@ -19,6 +19,7 @@ export default function AiTutorChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userId, setUserId] = useState("");
   const [input, setInput] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadMessages() {
@@ -49,25 +50,32 @@ export default function AiTutorChatPage() {
 
     setSending(true);
     setInput("");
+    setError("");
 
-    const { data } = await sendUserMessage(conversationId, userId, messageText);
+    try {
+      const { data, assistantMessage } = await sendUserMessage(
+        conversationId,
+        userId,
+        messageText
+      );
 
-    if (data) {
-      setMessages((currentMessages) => [
-        ...currentMessages,
-        data as Message,
-        {
-          id: `placeholder-${Date.now()}`,
-          conversation_id: conversationId,
-          user_id: userId,
-          role: "assistant",
-          content: t.aiTutorPage.aiComingSoon,
-          created_at: new Date().toISOString(),
-        },
-      ]);
+      if (data) {
+        setMessages((currentMessages) => [
+          ...currentMessages,
+          data as Message,
+          assistantMessage as Message,
+        ]);
+      }
+    } catch (sendError) {
+      setInput(messageText);
+      setError(
+        sendError instanceof Error
+          ? sendError.message
+          : "Failed to send message."
+      );
+    } finally {
+      setSending(false);
     }
-
-    setSending(false);
   }
 
   function fillPrompt(prompt: string) {
@@ -211,6 +219,12 @@ export default function AiTutorChatPage() {
               {sending ? "..." : t.aiTutorPage.send}
             </button>
           </form>
+
+          {error && (
+            <p className="mx-auto mt-3 w-full max-w-5xl text-sm font-medium text-red-600">
+              {error}
+            </p>
+          )}
         </div>
       </section>
     </main>

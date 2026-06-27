@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AppShell from "@/components/AppShell";
+import { sendAiTutorMessage } from "@/lib/studyApi";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+};
 
 type TutorCopy = {
   chatTitle: string;
@@ -351,6 +358,57 @@ const recentChats = [
   },
 ] as const;
 
+const promptText: Record<
+  Language,
+  Record<(typeof promptCards)[number]["key"], string>
+> = {
+  en: {
+    explain: "Explain this topic in simple words with examples.",
+    step: "Solve this step by step and explain each step clearly.",
+    exam: "Create a quick exam revision plan for this topic.",
+    practice: "Create practice questions with answers for this topic.",
+  },
+  ru: {
+    explain: "Объясни эту тему простыми словами с примерами.",
+    step: "Реши это пошагово и понятно объясни каждый шаг.",
+    exam: "Составь быстрый план повторения этой темы перед экзаменом.",
+    practice: "Создай практические вопросы с ответами по этой теме.",
+  },
+  kz: {
+    explain: "Осы тақырыпты мысалдармен қарапайым тілде түсіндір.",
+    step: "Мұны қадам бойынша шығарып, әр қадамды түсіндір.",
+    exam: "Осы тақырып бойынша емтиханға жылдам қайталау жоспарын құр.",
+    practice: "Осы тақырып бойынша жауаптары бар тәжірибелік сұрақтар жаса.",
+  },
+};
+
+const recentPromptText: Record<
+  Language,
+  Record<(typeof recentChats)[number]["key"], string>
+> = {
+  en: {
+    pythagorean: "Explain the Pythagorean theorem and show one example.",
+    photosynthesis: "Explain the photosynthesis process in simple terms.",
+    newton: "Explain Newton's laws of motion with examples.",
+    quadratic: "Help me solve quadratic equation problems step by step.",
+    cell: "Explain cell structure and function for exam revision.",
+  },
+  ru: {
+    pythagorean: "Объясни теорему Пифагора и покажи один пример.",
+    photosynthesis: "Объясни процесс фотосинтеза простыми словами.",
+    newton: "Объясни законы движения Ньютона с примерами.",
+    quadratic: "Помоги решать квадратные уравнения пошагово.",
+    cell: "Объясни строение и функции клетки для подготовки к экзамену.",
+  },
+  kz: {
+    pythagorean: "Пифагор теоремасын түсіндір және бір мысал көрсет.",
+    photosynthesis: "Фотосинтез процесін қарапайым тілде түсіндір.",
+    newton: "Ньютонның қозғалыс заңдарын мысалдармен түсіндір.",
+    quadratic: "Квадрат теңдеулерді қадам бойынша шығаруға көмектес.",
+    cell: "Емтиханға дайындық үшін жасушаның құрылымы мен қызметін түсіндір.",
+  },
+};
+
 function getStoredLanguage(): Language {
   if (typeof window === "undefined") return "ru";
 
@@ -392,6 +450,12 @@ function formatDate(date: Date | "today", language: Language, todayLabel: string
 function TutorContent() {
   const [language, setLanguage] = useState<Language>("ru");
   const [theme, setTheme] = useState<Theme>("dark");
+  const [conversationId, setConversationId] = useState<string>();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const [usageLabel, setUsageLabel] = useState("");
 
   const t = copy[language];
   const isDark = theme === "dark";
@@ -467,6 +531,85 @@ function TutorContent() {
     [language, t.today]
   );
 
+  async function sendMessage(messageText: string) {
+    const trimmed = messageText.trim();
+
+    if (!trimmed || sending) return;
+
+    const now = new Date().toISOString();
+    const optimisticUserMessage: ChatMessage = {
+      id: `local-user-${Date.now()}`,
+      role: "user",
+      content: trimmed,
+      createdAt: now,
+    };
+
+    setMessages((current) => [...current, optimisticUserMessage]);
+    setInput("");
+    setError("");
+    setSending(true);
+
+    try {
+      const response = await sendAiTutorMessage({
+        message: trimmed,
+        conversation_id: conversationId,
+        title: trimmed.slice(0, 80),
+      });
+
+      setConversationId(response.conversation_id);
+      setMessages((current) => [
+        ...current.filter((message) => message.id !== optimisticUserMessage.id),
+        {
+          id: response.user_message.id,
+          role: "user",
+          content: response.user_message.content,
+          createdAt: response.user_message.created_at,
+        },
+        {
+          id: response.assistant_message.id,
+          role: "assistant",
+          content: response.assistant_message.content,
+          createdAt: response.assistant_message.created_at,
+        },
+      ]);
+      setUsageLabel(
+        `${response.usage.ai_requests_used} / ${response.usage.monthly_ai_request_limit}`
+      );
+    } catch (sendError) {
+      setMessages((current) =>
+        current.filter((message) => message.id !== optimisticUserMessage.id)
+      );
+      setInput(trimmed);
+      setError(
+        sendError instanceof Error
+          ? sendError.message
+          : "Failed to send message."
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void sendMessage(input);
+  }
+
+  function handlePromptClick(key: (typeof promptCards)[number]["key"]) {
+    setInput(promptText[language][key]);
+  }
+
+  function handleRecentClick(key: (typeof recentChats)[number]["key"]) {
+    void sendMessage(recentPromptText[language][key]);
+  }
+
+  function formatMessageTime(value: string) {
+    return new Intl.DateTimeFormat(localeMap[language], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  }
+
   return (
     <div className={pageClass}>
       <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -485,6 +628,13 @@ function TutorContent() {
 
             <button
               type="button"
+              onClick={() => {
+                setConversationId(undefined);
+                setMessages([]);
+                setInput("");
+                setError("");
+                setUsageLabel("");
+              }}
               className={`inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border px-4 text-sm font-black transition ${
                 isDark
                   ? "border-white/10 bg-slate-950/60 text-slate-200 hover:border-blue-400/30 hover:bg-blue-400/10"
@@ -519,6 +669,7 @@ function TutorContent() {
                 <button
                   key={card.key}
                   type="button"
+                  onClick={() => handlePromptClick(card.key)}
                   className={`min-w-0 rounded-3xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${
                     isDark
                       ? "border-white/10 bg-slate-950/40 hover:border-blue-400/40 hover:bg-blue-400/10"
@@ -546,32 +697,95 @@ function TutorContent() {
           </div>
 
           <div className="border-t border-slate-200 p-5 dark:border-white/10 sm:p-6">
-            <div className="flex justify-end">
-              <div className="max-w-[560px] rounded-[1.5rem] bg-blue-600 px-5 py-4 text-white shadow-sm shadow-blue-600/20">
-                <p className="text-sm font-semibold leading-6">
-                  {t.userMessage}
-                </p>
-                <p className="mt-2 text-xs font-bold text-blue-100">10:23</p>
-              </div>
-            </div>
+            {messages.length === 0 ? (
+              <>
+                <div className="flex justify-end">
+                  <div className="max-w-[560px] rounded-[1.5rem] bg-blue-600 px-5 py-4 text-white shadow-sm shadow-blue-600/20">
+                    <p className="text-sm font-semibold leading-6">
+                      {t.userMessage}
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-blue-100">10:23</p>
+                  </div>
+                </div>
 
-            <div className="mt-5 flex justify-start">
-              <div
-                className={`max-w-[680px] rounded-[1.5rem] border px-5 py-4 ${softCardClass}`}
-              >
-                <p className={`text-sm font-semibold leading-7 ${titleClass}`}>
-                  {t.assistantMessage}
-                </p>
-                <p className={`mt-2 text-xs font-bold ${mutedClass}`}>10:24</p>
+                <div className="mt-5 flex justify-start">
+                  <div
+                    className={`max-w-[680px] rounded-[1.5rem] border px-5 py-4 ${softCardClass}`}
+                  >
+                    <p
+                      className={`text-sm font-semibold leading-7 ${titleClass}`}
+                    >
+                      {t.assistantMessage}
+                    </p>
+                    <p className={`mt-2 text-xs font-bold ${mutedClass}`}>
+                      10:24
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-5">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={
+                      message.role === "user"
+                        ? "flex justify-end"
+                        : "flex justify-start"
+                    }
+                  >
+                    <div
+                      className={
+                        message.role === "user"
+                          ? "max-w-[560px] rounded-[1.5rem] bg-blue-600 px-5 py-4 text-white shadow-sm shadow-blue-600/20"
+                          : `max-w-[680px] rounded-[1.5rem] border px-5 py-4 ${softCardClass}`
+                      }
+                    >
+                      <p
+                        className={
+                          message.role === "user"
+                            ? "whitespace-pre-wrap text-sm font-semibold leading-6"
+                            : `whitespace-pre-wrap text-sm font-semibold leading-7 ${titleClass}`
+                        }
+                      >
+                        {message.content}
+                      </p>
+                      <p
+                        className={
+                          message.role === "user"
+                            ? "mt-2 text-xs font-bold text-blue-100"
+                            : `mt-2 text-xs font-bold ${mutedClass}`
+                        }
+                      >
+                        {formatMessageTime(message.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+                {sending && (
+                  <div className="flex justify-start">
+                    <div
+                      className={`max-w-[680px] rounded-[1.5rem] border px-5 py-4 ${softCardClass}`}
+                    >
+                      <p className={`text-sm font-semibold ${mutedClass}`}>
+                        Thinking...
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </div>
 
           <div className="border-t border-slate-200 p-5 dark:border-white/10 sm:p-6">
-            <div
+            <form
+              onSubmit={handleSubmit}
               className={`flex flex-col gap-3 rounded-3xl border p-3 sm:flex-row sm:items-center ${softCardClass}`}
             >
               <input
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
                 placeholder={t.inputPlaceholder}
                 className={`h-12 min-w-0 flex-1 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
               />
@@ -579,6 +793,9 @@ function TutorContent() {
               <div className="flex gap-3">
                 <button
                   type="button"
+                  onClick={() =>
+                    setError("File attachments are available on the Files page.")
+                  }
                   className={`inline-flex h-12 flex-1 items-center justify-center rounded-2xl border px-4 text-sm font-black transition sm:flex-none ${
                     isDark
                       ? "border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10"
@@ -589,13 +806,27 @@ function TutorContent() {
                 </button>
 
                 <button
-                  type="button"
-                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 sm:flex-none"
+                  type="submit"
+                  disabled={sending || !input.trim()}
+                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
                 >
-                  {t.send}
+                  {sending ? "..." : t.send}
                 </button>
               </div>
-            </div>
+            </form>
+
+            {(error || usageLabel) && (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                {error && (
+                  <p className="text-sm font-semibold text-red-500">{error}</p>
+                )}
+                {usageLabel && (
+                  <p className={`text-xs font-black ${mutedClass}`}>
+                    AI usage: {usageLabel}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
@@ -657,6 +888,7 @@ function TutorContent() {
                 <button
                   key={chat.key}
                   type="button"
+                  onClick={() => handleRecentClick(chat.key)}
                   className={`flex min-w-0 items-center gap-4 rounded-2xl p-3 text-left transition ${
                     isDark
                       ? "hover:bg-white/10"
