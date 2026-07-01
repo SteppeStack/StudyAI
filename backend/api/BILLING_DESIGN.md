@@ -1,8 +1,8 @@
 # StudyAI Billing Backend Design
 
-Payment integration is not implemented yet because the payment provider has not been chosen.
+Payment integration is not implemented yet.
 
-This document defines the backend design that should be implemented when a provider is selected.
+The selected provider is Stripe.
 
 ## Current State
 
@@ -21,8 +21,6 @@ Existing plan ids:
 The frontend must not update `subscriptions` directly.
 
 ## Recommended Provider Flow
-
-Use a trusted payment provider such as Stripe, Paddle, Lemon Squeezy, or another provider supported in the deployment region.
 
 The provider flow should be:
 
@@ -93,17 +91,118 @@ Webhook should handle:
 
 ## Required Environment Variables
 
-Provider-specific names will be decided later. A Stripe-like setup would need:
+Add these variables only to the backend deployment environment:
 
 ```env
 PAYMENT_PROVIDER=stripe
-PAYMENT_SECRET_KEY=
-PAYMENT_WEBHOOK_SECRET=
 PAYMENT_SUCCESS_URL=
 PAYMENT_CANCEL_URL=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_STUDENT_PREMIUM_PRICE_ID=
+STRIPE_TEACHER_PRICE_ID=
 ```
 
-Never expose payment secret keys in frontend code.
+Example non-secret values:
+
+```env
+PAYMENT_PROVIDER=stripe
+PAYMENT_SUCCESS_URL=https://YOUR_FRONTEND_DOMAIN/subscription?success=1
+PAYMENT_CANCEL_URL=https://YOUR_FRONTEND_DOMAIN/subscription?canceled=1
+```
+
+Secret values must come from Stripe Dashboard:
+
+```env
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_STUDENT_PREMIUM_PRICE_ID=price_...
+STRIPE_TEACHER_PRICE_ID=price_...
+```
+
+Never expose `STRIPE_SECRET_KEY` or `STRIPE_WEBHOOK_SECRET` in frontend code.
+
+## Stripe Products and Prices Example
+
+Use Stripe Dashboard or Stripe CLI to create two recurring monthly prices.
+
+Currency:
+
+```text
+kzt
+```
+
+Important:
+
+- Use Stripe's lowercase ISO currency code `kzt`.
+- Do not use `tg` as the API currency code.
+- Stripe API amounts are sent in the currency's minor unit.
+
+Products:
+
+```text
+Product: StudyAI Student Premium
+Metadata:
+  plan_id=student_premium
+Price:
+  currency=kzt
+  unit_amount=599900
+  recurring interval=month
+```
+
+```text
+Product: StudyAI Teacher Plan
+Metadata:
+  plan_id=teacher
+Price:
+  currency=kzt
+  unit_amount=1099900
+  recurring interval=month
+```
+
+Human-readable prices:
+
+```text
+student_premium: ₸5,999 / month
+teacher: ₸10,999 / month
+```
+
+Example Stripe CLI commands:
+
+```powershell
+stripe products create `
+  --name "StudyAI Student Premium" `
+  --metadata "plan_id=student_premium"
+```
+
+```powershell
+stripe prices create `
+  --product prod_STUDENT_PREMIUM_ID `
+  --currency kzt `
+  --unit-amount 599900 `
+  --recurring "interval=month"
+```
+
+```powershell
+stripe products create `
+  --name "StudyAI Teacher Plan" `
+  --metadata "plan_id=teacher"
+```
+
+```powershell
+stripe prices create `
+  --product prod_TEACHER_ID `
+  --currency kzt `
+  --unit-amount 1099900 `
+  --recurring "interval=month"
+```
+
+After creating prices, copy the returned `price_...` ids into backend env:
+
+```env
+STRIPE_STUDENT_PREMIUM_PRICE_ID=price_...
+STRIPE_TEACHER_PRICE_ID=price_...
+```
 
 ## Subscription Update Rules
 

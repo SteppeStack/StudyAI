@@ -35,6 +35,14 @@ MAX_UPLOAD_SIZE_BYTES=26214400
 MAX_ANALYSIS_FILE_SIZE_BYTES=10485760
 MAX_AI_INPUT_CHARS=30000
 AI_TUTOR_HISTORY_LIMIT=8
+
+PAYMENT_PROVIDER=stripe
+PAYMENT_SUCCESS_URL=https://YOUR_FRONTEND_DOMAIN/subscription?success=1
+PAYMENT_CANCEL_URL=https://YOUR_FRONTEND_DOMAIN/subscription?canceled=1
+STRIPE_SECRET_KEY=YOUR_STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET=YOUR_STRIPE_WEBHOOK_SECRET
+STRIPE_STUDENT_PREMIUM_PRICE_ID=YOUR_STRIPE_STUDENT_PREMIUM_PRICE_ID
+STRIPE_TEACHER_PRICE_ID=YOUR_STRIPE_TEACHER_PRICE_ID
 ```
 
 Use comma-separated origins if you need both production and local frontend:
@@ -43,7 +51,23 @@ Use comma-separated origins if you need both production and local frontend:
 API_CORS_ORIGINS=https://YOUR_FRONTEND_DOMAIN,http://localhost:3000
 ```
 
-Never expose `SUPABASE_SERVICE_ROLE_KEY` or `GEMINI_API_KEY` in frontend code.
+Never expose `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `STRIPE_SECRET_KEY`, or `STRIPE_WEBHOOK_SECRET` in frontend code.
+
+## Stripe Products and Prices
+
+Create monthly recurring Stripe prices:
+
+```text
+student_premium: currency=kzt, unit_amount=599900, display price ₸5,999/month
+teacher: currency=kzt, unit_amount=1099900, display price ₸10,999/month
+```
+
+Save the returned `price_...` ids in:
+
+```env
+STRIPE_STUDENT_PREMIUM_PRICE_ID=
+STRIPE_TEACHER_PRICE_ID=
+```
 
 ## Required Supabase Migrations
 

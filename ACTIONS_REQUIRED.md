@@ -35,10 +35,13 @@ During autonomous work, Codex should add items here instead of stopping immediat
     3. Activate `.venv`.
     4. Run `pip install -r requirements.txt`.
     5. Run `python -m pytest`.
+  - Current note: Codex checked again and `.venv` still points to the missing Python executable; `python` is still not available in PATH in this session.
   - Needed value/result: backend tests should start successfully.
   - Related task: Fix local Python environment and make backend tests runnable again.
 
-- [ ] 2026-07-01 - Apply Documents API migration in Supabase
+## Completed Actions
+
+- [x] 2026-07-01 - Apply Documents API migration in Supabase
   - Why: the new Documents API uses the `public.documents` table, which must exist in Supabase.
   - Where: Supabase Dashboard -> SQL Editor.
   - Steps:
@@ -49,7 +52,7 @@ During autonomous work, Codex should add items here instead of stopping immediat
   - Needed value/result: `public.documents` table exists in the shared Supabase project.
   - Related task: Add Documents API.
 
-- [ ] 2026-07-01 - Apply Exam Prep API migration in Supabase
+- [x] 2026-07-01 - Apply Exam Prep API migration in Supabase
   - Why: the new Exam Prep API uses the `public.exam_preps` table, which must exist in Supabase.
   - Where: Supabase Dashboard -> SQL Editor.
   - Steps:
@@ -60,7 +63,7 @@ During autonomous work, Codex should add items here instead of stopping immediat
   - Needed value/result: `public.exam_preps` table exists in the shared Supabase project.
   - Related task: Add Exam Prep API.
 
-- [ ] 2026-07-01 - Apply Diploma API migration in Supabase
+- [x] 2026-07-01 - Apply Diploma API migration in Supabase
   - Why: the new Diploma API uses the `public.diploma_projects` table, which must exist in Supabase.
   - Where: Supabase Dashboard -> SQL Editor.
   - Steps:
@@ -71,7 +74,7 @@ During autonomous work, Codex should add items here instead of stopping immediat
   - Needed value/result: `public.diploma_projects` table exists in the shared Supabase project.
   - Related task: Add Diploma Assistant API.
 
-- [ ] 2026-07-01 - Apply AI request events migration in Supabase
+- [x] 2026-07-01 - Apply AI request events migration in Supabase
   - Why: daily AI limits and per-feature AI request accounting use the new `public.ai_request_events` table.
   - Where: Supabase Dashboard -> SQL Editor.
   - Steps:
@@ -82,7 +85,7 @@ During autonomous work, Codex should add items here instead of stopping immediat
   - Needed value/result: `public.ai_request_events` table exists in the shared Supabase project.
   - Related task: Add usage limits and AI request accounting.
 
-- [ ] 2026-07-01 - Choose payment provider
+- [x] 2026-07-01 - Choose payment provider
   - Why: real subscription checkout and webhooks cannot be implemented safely until the payment provider is chosen.
   - Where: project/product decision.
   - Steps:
@@ -92,8 +95,5 @@ During autonomous work, Codex should add items here instead of stopping immediat
     4. Create provider products/prices if needed.
     5. Share only the required server-side env variable names/values for backend deployment.
   - Needed value/result: selected provider and test credentials for backend integration.
+  - Result: Stripe selected. Currency code: `kzt`. Prices: `student_premium` ₸5,999/month, `teacher` ₸10,999/month.
   - Related task: Add subscription/payment backend design before real payment provider integration.
-
-## Completed Actions
-
-No completed actions yet.
