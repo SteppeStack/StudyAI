@@ -1,5 +1,6 @@
 "use client";
 
+import AuthGuard from "@/components/AuthGuard";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
