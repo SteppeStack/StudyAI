@@ -53,12 +53,7 @@ export default function AuthShell({
     ? "border-white/10 bg-slate-900/70 shadow-black/20"
     : "border-slate-200 bg-white shadow-slate-200/70";
 
-  const softCardClass = isDark
-    ? "border-white/10 bg-slate-950/60"
-    : "border-slate-200 bg-slate-50";
-
   const titleClass = isDark ? "text-white" : "text-slate-950";
-  const textClass = isDark ? "text-slate-300" : "text-slate-600";
   const mutedClass = isDark ? "text-slate-400" : "text-slate-500";
 
   return (

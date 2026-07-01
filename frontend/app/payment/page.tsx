@@ -1,6 +1,7 @@
 "use client";
 
-import AppShell, { type AppLanguage } from "@/components/AppShell";
+import AppShell from "@/components/AppShell";
+import { type Language } from "@/lib/i18n";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -221,7 +222,7 @@ function formatPrice(value: number) {
 }
 
 export default function PaymentPage() {
-  const [language, setLanguage] = useState<AppLanguage>("en");
+  const [language] = useState<Language>("en");
   const [plan, setPlan] = useState<PlanKey>("pro");
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
@@ -251,12 +252,7 @@ export default function PaymentPage() {
   }
 
   return (
-    <AppShell
-      language={language}
-      onLanguageChange={setLanguage}
-      title={t.title}
-      subtitle={t.subtitle}
-    >
+    <AppShell>
       <div className="mx-auto max-w-7xl space-y-6">
         <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-blue-100/70 blur-3xl" />

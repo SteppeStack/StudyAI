@@ -201,6 +201,7 @@ class FilesService:
         updated_usage = await self.supabase.increment_ai_usage(
             usage_id=usage_context["usage"]["id"],
             current_value=usage_context["usage"]["ai_requests_used"],
+            feature="files",
         )
         await self.supabase.insert_file_analysis_result(
             user_id=user.id,

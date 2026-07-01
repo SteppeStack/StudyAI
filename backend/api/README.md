@@ -11,6 +11,10 @@ It does not replace Supabase Auth or the Supabase database in Sprint 1. The fron
 - AI Tutor endpoint: `POST /api/v1/ai/chat`
 - Files endpoints: `POST /api/v1/files/upload`, `GET /api/v1/files`
 - Assignments endpoints: `POST /api/v1/assignments`, `POST /api/v1/assignments/{id}/generate`
+- Documents endpoints: `POST /api/v1/documents`, `POST /api/v1/documents/{id}/generate`
+- Exam Prep endpoints: `POST /api/v1/exam-preps`, `POST /api/v1/exam-preps/{id}/generate`
+- Diploma endpoints: `POST /api/v1/diplomas`, `POST /api/v1/diplomas/{id}/generate`
+- Dashboard endpoint: `GET /api/v1/dashboard`
 - Interactive Swagger UI: `/docs`
 - CORS for the future Next.js frontend
 - Automated tests for health and AI route structure
@@ -87,6 +91,20 @@ See `AI_CHAT_API.md`.
 See `FILES_API.md` for the Files Workspace upload/list/delete contract.
 
 See `ASSIGNMENTS_API.md` for the Assignment Helper contract.
+
+See `DOCUMENTS_API.md` for the Documents workspace and AI document generation contract.
+
+See `EXAM_PREPS_API.md` for the Exam Preparation contract.
+
+See `DIPLOMA_API.md` for the Diploma workspace contract.
+
+See `USAGE_LIMITS.md` for daily/monthly AI request limit behavior.
+
+See `DASHBOARD_API.md` for the server-side dashboard summary contract.
+
+See `BILLING_DESIGN.md` for the future subscription/payment backend design.
+
+See `ERROR_RESPONSES.md` for frontend error handling.
 
 After this endpoint is deployed, the frontend should call `POST /api/v1/ai/chat` for AI Tutor messages instead of inserting `ai_messages` directly. The API saves both the user message and the Gemini assistant response.
 

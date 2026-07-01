@@ -462,30 +462,9 @@ function getStoredTheme(): Theme {
   return "dark";
 }
 
-function getDisplayName() {
-  if (typeof window === "undefined") return "Student";
-
-  return (
-    window.localStorage.getItem("studyai-display-name") ||
-    window.localStorage.getItem("studyai_display_name") ||
-    window.localStorage.getItem("displayName") ||
-    "Student"
-  );
-}
-
-function getInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-
-  if (parts.length === 0) return "ST";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-
-  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-}
-
 function DashboardContent() {
   const [language, setLanguage] = useState<Language>("ru");
   const [theme, setTheme] = useState<Theme>("dark");
-  const [displayName, setDisplayName] = useState("Student");
 
   const t = copy[language];
   const isDark = theme === "dark";
@@ -493,7 +472,6 @@ function DashboardContent() {
   useEffect(() => {
     setLanguage(getStoredLanguage());
     setTheme(getStoredTheme());
-    setDisplayName(getDisplayName());
 
     function handleLanguageChange(event: Event) {
       const customEvent = event as CustomEvent<Language>;
@@ -518,7 +496,6 @@ function DashboardContent() {
     function handleStorageChange() {
       setLanguage(getStoredLanguage());
       setTheme(getStoredTheme());
-      setDisplayName(getDisplayName());
     }
 
     window.addEventListener("studyai:language-change", handleLanguageChange);

@@ -98,6 +98,7 @@ class AssignmentsService:
         updated_usage = await self.supabase.increment_ai_usage(
             usage_id=usage_context["usage"]["id"],
             current_value=usage_context["usage"]["ai_requests_used"],
+            feature="assignments",
         )
         await self.supabase.create_activity_event(
             user_id=user.id,

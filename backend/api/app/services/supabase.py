@@ -141,27 +141,95 @@ class SupabaseGateway:
         )
         return created[0]
 
+    async def get_profile(self, user_id: str) -> dict[str, Any]:
+        rows = await self._rest_get(
+            "profiles",
+            {
+                "id": f"eq.{user_id}",
+                "select": "id,email,full_name,avatar_url,account_role,subscription_plan",
+                "limit": "1",
+            },
+        )
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Profile not found",
+            )
+        return rows[0]
+
+    async def get_subscription_context(self, user_id: str) -> dict[str, Any]:
+        subscription = await self._get_current_subscription(user_id)
+        plan = await self._get_plan(subscription["plan_id"])
+        return {"subscription": subscription, "plan": plan}
+
+    async def get_current_monthly_usage(self, user_id: str) -> dict[str, Any]:
+        return await self._get_or_create_monthly_usage(user_id)
+
+    async def list_recent_activity(self, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
+        return await self._rest_get(
+            "activity_events",
+            {
+                "user_id": f"eq.{user_id}",
+                "select": "id,event_type,title,description,status,resource_type,resource_id,created_at",
+                "order": "created_at.desc",
+                "limit": str(limit),
+            },
+        )
+
+    async def list_active_plans(self) -> list[dict[str, Any]]:
+        return await self._rest_get(
+            "plans",
+            {
+                "is_active": "eq.true",
+                "select": "id,display_name,audience,monthly_price_cents,currency,daily_ai_request_limit,monthly_ai_request_limit",
+                "order": "monthly_price_cents.asc",
+            },
+        )
+
     async def get_usage_context(self, user_id: str) -> dict[str, Any]:
         subscription = await self._get_current_subscription(user_id)
         plan = await self._get_plan(subscription["plan_id"])
         usage = await self._get_or_create_monthly_usage(user_id)
 
-        limit = plan.get("monthly_ai_request_limit")
-        if limit is not None and usage["ai_requests_used"] >= limit:
+        monthly_limit = plan.get("monthly_ai_request_limit")
+        if monthly_limit is not None and usage["ai_requests_used"] >= monthly_limit:
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
                 detail="Monthly AI request limit reached",
             )
 
+        daily_limit = plan.get("daily_ai_request_limit")
+        if daily_limit is not None:
+            daily_count = await self._count_daily_ai_requests(user_id)
+            if daily_count >= daily_limit:
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail="Daily AI request limit reached",
+                )
+
         return {"plan": plan, "usage": usage}
 
-    async def increment_ai_usage(self, usage_id: str, current_value: int) -> dict[str, Any]:
+    async def increment_ai_usage(
+        self,
+        usage_id: str,
+        current_value: int,
+        feature: str = "ai",
+    ) -> dict[str, Any]:
         updated = await self._rest_patch(
             "monthly_usage",
             {"id": f"eq.{usage_id}"},
             {"ai_requests_used": current_value + 1},
         )
-        return updated[0]
+        usage = updated[0]
+        await self._rest_post(
+            "ai_request_events",
+            {
+                "user_id": usage["user_id"],
+                "usage_id": usage_id,
+                "feature": feature,
+            },
+        )
+        return usage
 
     async def create_activity_event(
         self,
@@ -421,6 +489,189 @@ class SupabaseGateway:
             },
         )
 
+    async def insert_document(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        created = await self._rest_post("documents", {"user_id": user_id, **data})
+        return created[0]
+
+    async def list_documents(self, user_id: str) -> list[dict[str, Any]]:
+        return await self._rest_get(
+            "documents",
+            {
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "order": "updated_at.desc",
+            },
+        )
+
+    async def get_document(self, user_id: str, document_id: str) -> dict[str, Any]:
+        rows = await self._rest_get(
+            "documents",
+            {
+                "id": f"eq.{document_id}",
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "limit": "1",
+            },
+        )
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found",
+            )
+        return rows[0]
+
+    async def update_document(
+        self,
+        user_id: str,
+        document_id: str,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+        updated = await self._rest_patch(
+            "documents",
+            {
+                "id": f"eq.{document_id}",
+                "user_id": f"eq.{user_id}",
+            },
+            data,
+        )
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found",
+            )
+        return updated[0]
+
+    async def delete_document(self, user_id: str, document_id: str) -> None:
+        await self._rest_delete(
+            "documents",
+            {
+                "id": f"eq.{document_id}",
+                "user_id": f"eq.{user_id}",
+            },
+        )
+
+    async def insert_exam_prep(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        created = await self._rest_post("exam_preps", {"user_id": user_id, **data})
+        return created[0]
+
+    async def list_exam_preps(self, user_id: str) -> list[dict[str, Any]]:
+        return await self._rest_get(
+            "exam_preps",
+            {
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "order": "updated_at.desc",
+            },
+        )
+
+    async def get_exam_prep(self, user_id: str, exam_prep_id: str) -> dict[str, Any]:
+        rows = await self._rest_get(
+            "exam_preps",
+            {
+                "id": f"eq.{exam_prep_id}",
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "limit": "1",
+            },
+        )
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exam prep not found",
+            )
+        return rows[0]
+
+    async def update_exam_prep(
+        self,
+        user_id: str,
+        exam_prep_id: str,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+        updated = await self._rest_patch(
+            "exam_preps",
+            {
+                "id": f"eq.{exam_prep_id}",
+                "user_id": f"eq.{user_id}",
+            },
+            data,
+        )
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exam prep not found",
+            )
+        return updated[0]
+
+    async def delete_exam_prep(self, user_id: str, exam_prep_id: str) -> None:
+        await self._rest_delete(
+            "exam_preps",
+            {
+                "id": f"eq.{exam_prep_id}",
+                "user_id": f"eq.{user_id}",
+            },
+        )
+
+    async def insert_diploma_project(self, user_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        created = await self._rest_post("diploma_projects", {"user_id": user_id, **data})
+        return created[0]
+
+    async def list_diploma_projects(self, user_id: str) -> list[dict[str, Any]]:
+        return await self._rest_get(
+            "diploma_projects",
+            {
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "order": "updated_at.desc",
+            },
+        )
+
+    async def get_diploma_project(self, user_id: str, diploma_id: str) -> dict[str, Any]:
+        rows = await self._rest_get(
+            "diploma_projects",
+            {
+                "id": f"eq.{diploma_id}",
+                "user_id": f"eq.{user_id}",
+                "select": "*",
+                "limit": "1",
+            },
+        )
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Diploma project not found",
+            )
+        return rows[0]
+
+    async def update_diploma_project(
+        self,
+        user_id: str,
+        diploma_id: str,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+        updated = await self._rest_patch(
+            "diploma_projects",
+            {
+                "id": f"eq.{diploma_id}",
+                "user_id": f"eq.{user_id}",
+            },
+            data,
+        )
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Diploma project not found",
+            )
+        return updated[0]
+
+    async def delete_diploma_project(self, user_id: str, diploma_id: str) -> None:
+        await self._rest_delete(
+            "diploma_projects",
+            {
+                "id": f"eq.{diploma_id}",
+                "user_id": f"eq.{user_id}",
+            },
+        )
+
     async def get_file_analysis_result(
         self,
         user_id: str,
@@ -526,6 +777,18 @@ class SupabaseGateway:
             {"user_id": user_id, "period_start": period_start},
         )
         return created[0]
+
+    async def _count_daily_ai_requests(self, user_id: str) -> int:
+        day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        rows = await self._rest_get(
+            "ai_request_events",
+            {
+                "user_id": f"eq.{user_id}",
+                "created_at": f"gte.{day_start.isoformat()}",
+                "select": "id",
+            },
+        )
+        return len(rows)
 
     async def _rest_get(self, table: str, params: dict[str, str]) -> list[dict[str, Any]]:
         try:

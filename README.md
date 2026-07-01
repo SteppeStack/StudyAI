@@ -54,18 +54,26 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 This keeps the database as the source of truth and prevents hidden manual changes.
 
-## Current Sprint
+## Current Backend State
 
-Sprint 3: Dashboard data and subscriptions
+The backend now includes Supabase migrations and a Python FastAPI service.
 
-Goal:
+Ready or scaffolded backend areas:
 
-- Sprint 1 is complete: Auth, `profiles`, and RLS.
-- Users can create and manage only their own AI Tutor conversations.
-- Users can read only their own AI Tutor messages.
-- Users can create only messages with the `user` role.
-- Assistant messages will be created later by the Python API.
-- Plans, subscriptions, monthly usage, and activity events are available for the dashboard.
+- Supabase Auth, `profiles`, and RLS.
+- AI Tutor data model and Python AI chat endpoint.
+- Dashboard plans, subscriptions, monthly usage, and activity events.
+- Files workspace upload/list/delete/signed-url/analyze endpoints.
+- Assignment Helper CRUD and AI generation endpoints.
+- Documents CRUD and AI generation endpoints.
+- Exam Prep CRUD and AI generation endpoints.
+- Diploma workspace CRUD and AI generation endpoints.
+- AI usage accounting with daily/monthly limit checks.
+
+Use these coordination files for ongoing backend work:
+
+- `BACKEND_ROADMAP.md` - autonomous backend TODO list.
+- `ACTIONS_REQUIRED.md` - manual actions needed from the user.
 
 ## Repository Rules
 
@@ -75,3 +83,4 @@ Goal:
 - Put frontend changes in `frontend/`.
 - Every database change should be saved as a migration.
 - After changing backend behavior, update `backend/README.md` if the frontend developer needs to know something.
+- If user action is required, add it to `ACTIONS_REQUIRED.md`.

@@ -442,10 +442,6 @@ function SubscriptionContent() {
     ? "border-white/10 bg-slate-900/70 shadow-sm"
     : "border-slate-200 bg-white shadow-sm";
 
-  const softCardClass = isDark
-    ? "border-white/10 bg-slate-950/50"
-    : "border-slate-200 bg-slate-50";
-
   const titleClass = isDark ? "text-white" : "text-slate-950";
   const textClass = isDark ? "text-slate-300" : "text-slate-600";
   const mutedClass = isDark ? "text-slate-400" : "text-slate-500";

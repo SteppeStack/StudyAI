@@ -516,7 +516,6 @@ function TutorContent() {
     : "border-slate-200 bg-slate-50";
 
   const titleClass = isDark ? "text-white" : "text-slate-950";
-  const textClass = isDark ? "text-slate-300" : "text-slate-600";
   const mutedClass = isDark ? "text-slate-400" : "text-slate-500";
   const inputClass = isDark
     ? "border-white/10 bg-slate-950/70 text-white placeholder:text-slate-500 focus:border-blue-400 focus:ring-blue-500/10"
