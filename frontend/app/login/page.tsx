@@ -7,6 +7,7 @@ import AuthShell, {
   type AuthLanguage,
   type AuthTheme,
 } from "@/components/AuthShell";
+import { getDisplayNameFromMetadata, saveDisplayName } from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
 
 type LoginCopy = {
@@ -252,13 +253,19 @@ export default function LoginPage() {
         throw new Error(t.form.supabaseMissing);
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
         throw error;
+      }
+
+      const metadata = data.user?.user_metadata;
+      if (metadata) {
+        const displayName = getDisplayNameFromMetadata(metadata);
+        if (displayName) saveDisplayName(displayName);
       }
 
       router.replace("/dashboard");

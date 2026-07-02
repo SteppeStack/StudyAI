@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { readLocalProfile, saveLocalProfile } from "@/lib/profile";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -433,6 +434,507 @@ const languageStorageKeys = [
 ];
 
 const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
+const assignmentsStorageKey = "studyai-local-assignments";
+const filesStorageKey = "studyai-local-files";
+const documentsStorageKey = "studyai-local-documents";
+const examStorageKey = "studyai-exam-prep-saved";
+const diplomaChaptersStorageKey = "studyai-diploma-chapters";
+const onboardingStorageKey = "studyai-onboarding-state";
+const studyProgressStorageKey = "studyai-study-progress";
+
+type StoredAssignment = {
+  id?: string | number;
+  title?: string;
+  name?: string;
+  subject?: string;
+  course?: string;
+  status?: string;
+  priority?: string;
+  deadline?: string;
+  dueDate?: string;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+};
+
+type CalendarGroupKey = "overdue" | "today" | "week" | "later";
+
+type CalendarItem = {
+  id: string;
+  title: string;
+  due: string;
+  href: string;
+};
+
+type StudyProgress = {
+  lastActiveDate?: string;
+  streak: number;
+};
+
+type StoredFile = {
+  id?: string | number;
+  title?: string;
+  name?: string;
+  date?: string;
+  uploadedAt?: string;
+  createdAt?: string;
+};
+
+type StoredDocument = {
+  id?: string | number;
+  title?: string;
+  updatedAt?: string;
+  createdAt?: string;
+};
+
+type StoredExam = {
+  id?: string | number;
+  title?: string;
+  subject?: string;
+  progress?: number;
+  date?: string;
+};
+
+type DashboardActivity = {
+  title: string;
+  time: string;
+  tag: string;
+  icon: string;
+  color: string;
+};
+
+type DashboardDeadline = {
+  title: string;
+  due: string;
+  href: string;
+  date: string;
+};
+
+type DashboardSnapshot = {
+  activeAssignments: number;
+  submittedAssignments: number;
+  documents: number;
+  files: number;
+  examProgress: number;
+  diplomaProgress: number;
+  dueThisWeek: number;
+  overdue: number;
+  studyStreak: number;
+  completedThisWeek: number;
+  activities: Omit<DashboardActivity, "color">[];
+  deadlines: DashboardDeadline[];
+  calendar: Record<CalendarGroupKey, CalendarItem[]>;
+};
+
+const emptySnapshot: DashboardSnapshot = {
+  activeAssignments: 0,
+  submittedAssignments: 0,
+  documents: 0,
+  files: 0,
+  examProgress: 0,
+  diplomaProgress: 0,
+  dueThisWeek: 0,
+  overdue: 0,
+  studyStreak: 0,
+  completedThisWeek: 0,
+  activities: [],
+  deadlines: [],
+  calendar: { overdue: [], today: [], week: [], later: [] },
+};
+
+const onboardingCopy = {
+  en: {
+    title: "Set up your academic workspace",
+    subtitle: "Add a few study details so StudyAI feels less empty on first launch.",
+    university: "University",
+    program: "Program / major",
+    level: "Study level",
+    goal: "Main study goal",
+    universityPlaceholder: "e.g. Hof University",
+    programPlaceholder: "e.g. Computer Science",
+    levelPlaceholder: "e.g. Bachelor, 2nd year",
+    goalPlaceholder: "e.g. submit assignments on time and prepare for exams",
+    save: "Save and start",
+    skip: "Skip for now",
+    quickStart: "Quick start",
+    assignment: "Create first assignment",
+    file: "Upload first file",
+    exam: "Generate study plan",
+    tutor: "Start AI Tutor",
+  },
+  ru: {
+    title: "Настрой учебный workspace",
+    subtitle: "Добавь несколько деталей, чтобы StudyAI не выглядел пустым при первом входе.",
+    university: "Университет",
+    program: "Программа / специальность",
+    level: "Уровень обучения",
+    goal: "Главная учебная цель",
+    universityPlaceholder: "например: Hof University",
+    programPlaceholder: "например: Computer Science",
+    levelPlaceholder: "например: бакалавр, 2 курс",
+    goalPlaceholder: "например: сдавать задания вовремя и готовиться к экзаменам",
+    save: "Сохранить и начать",
+    skip: "Пропустить",
+    quickStart: "Быстрый старт",
+    assignment: "Создать первое задание",
+    file: "Загрузить первый файл",
+    exam: "Создать учебный план",
+    tutor: "Открыть AI Tutor",
+  },
+  kz: {
+    title: "Оқу workspace баптау",
+    subtitle: "StudyAI бірінші кіргенде бос көрінбеуі үшін бірнеше оқу дерегін қосыңыз.",
+    university: "Университет",
+    program: "Бағдарлама / мамандық",
+    level: "Оқу деңгейі",
+    goal: "Негізгі оқу мақсаты",
+    universityPlaceholder: "мысалы: Hof University",
+    programPlaceholder: "мысалы: Computer Science",
+    levelPlaceholder: "мысалы: бакалавр, 2 курс",
+    goalPlaceholder: "мысалы: тапсырмаларды уақытында тапсыру және емтиханға дайындалу",
+    save: "Сақтап бастау",
+    skip: "Кейін",
+    quickStart: "Жылдам бастау",
+    assignment: "Алғашқы тапсырма",
+    file: "Алғашқы файл",
+    exam: "Оқу жоспары",
+    tutor: "AI Tutor ашу",
+  },
+} satisfies Record<Language, Record<string, string>>;
+
+const progressCopy = {
+  en: {
+    streak: "Study streak",
+    completed: "Completed this week",
+    due: "Due this week",
+    overdue: "Overdue",
+    days: "days",
+    calendar: "Academic calendar",
+    calendarSubtitle: "Assignments grouped by urgency from your local workspace.",
+    groups: {
+      overdue: "Overdue",
+      today: "Today",
+      week: "This week",
+      later: "Later",
+    },
+    empty: "No deadlines in this group.",
+  },
+  ru: {
+    streak: "Учебная серия",
+    completed: "Завершено за неделю",
+    due: "Дедлайны недели",
+    overdue: "Просрочено",
+    days: "дн.",
+    calendar: "Учебный календарь",
+    calendarSubtitle: "Задания сгруппированы по срочности из локального workspace.",
+    groups: {
+      overdue: "Просрочено",
+      today: "Сегодня",
+      week: "На этой неделе",
+      later: "Позже",
+    },
+    empty: "В этой группе нет дедлайнов.",
+  },
+  kz: {
+    streak: "Оқу сериясы",
+    completed: "Аптада аяқталды",
+    due: "Осы апта дедлайндары",
+    overdue: "Мерзімі өтті",
+    days: "күн",
+    calendar: "Оқу күнтізбесі",
+    calendarSubtitle: "Тапсырмалар жергілікті workspace бойынша срочностьпен топтастырылды.",
+    groups: {
+      overdue: "Мерзімі өтті",
+      today: "Бүгін",
+      week: "Осы апта",
+      later: "Кейін",
+    },
+    empty: "Бұл топта дедлайн жоқ.",
+  },
+} satisfies Record<
+  Language,
+  {
+    streak: string;
+    completed: string;
+    due: string;
+    overdue: string;
+    days: string;
+    calendar: string;
+    calendarSubtitle: string;
+    groups: Record<CalendarGroupKey, string>;
+    empty: string;
+  }
+>;
+
+function readArray<T>(key: string): T[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readRecord(key: string): Record<string, unknown> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function parseTime(value?: string) {
+  if (!value) return 0;
+
+  const time = new Date(value).getTime();
+
+  return Number.isFinite(time) ? time : 0;
+}
+
+function dateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function readStudyProgress(): StudyProgress {
+  if (typeof window === "undefined") return { streak: 0 };
+
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(studyProgressStorageKey) ?? "{}"
+    ) as Partial<StudyProgress>;
+
+    return {
+      lastActiveDate: parsed.lastActiveDate,
+      streak: typeof parsed.streak === "number" ? parsed.streak : 0,
+    };
+  } catch {
+    return { streak: 0 };
+  }
+}
+
+function touchStudyProgress() {
+  if (typeof window === "undefined") return 0;
+
+  const today = dateKey(new Date());
+  const previous = readStudyProgress();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const nextStreak =
+    previous.lastActiveDate === today
+      ? Math.max(previous.streak, 1)
+      : previous.lastActiveDate === dateKey(yesterday)
+      ? previous.streak + 1
+      : 1;
+
+  window.localStorage.setItem(
+    studyProgressStorageKey,
+    JSON.stringify({ lastActiveDate: today, streak: nextStreak })
+  );
+
+  return nextStreak;
+}
+
+function formatShortDate(value: string | undefined, language: Language) {
+  const time = parseTime(value);
+
+  if (!time) return "";
+
+  return new Intl.DateTimeFormat(
+    language === "en" ? "en-US" : language === "kz" ? "kk-KZ" : "ru-RU",
+    { day: "2-digit", month: "short" }
+  ).format(new Date(time));
+}
+
+function getAssignmentTitle(assignment: StoredAssignment) {
+  return (
+    assignment.title?.trim() ||
+    assignment.name?.trim() ||
+    assignment.subject?.trim() ||
+    assignment.course?.trim() ||
+    "Assignment"
+  );
+}
+
+function getAssignmentDeadline(assignment: StoredAssignment) {
+  return assignment.deadline || assignment.dueDate;
+}
+
+function getAssignmentHref(assignment: StoredAssignment) {
+  return assignment.id ? `/assignments/${assignment.id}` : "/assignments";
+}
+
+function getAssignmentTime(assignment: StoredAssignment) {
+  return (
+    assignment.updatedAt ||
+    assignment.updated_at ||
+    assignment.createdAt ||
+    assignment.created_at ||
+    getAssignmentDeadline(assignment)
+  );
+}
+
+function readDashboardSnapshot(language: Language): DashboardSnapshot {
+  const assignments = readArray<StoredAssignment>(assignmentsStorageKey);
+  const files = readArray<StoredFile>(filesStorageKey);
+  const documents = readArray<StoredDocument>(documentsStorageKey);
+  const exams = readArray<StoredExam>(examStorageKey);
+  const diplomaChapters = readRecord(diplomaChaptersStorageKey);
+  const now = startOfDay(new Date());
+  const weekEnd = new Date(now);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekStart = new Date(now);
+  weekStart.setDate(weekStart.getDate() - 7);
+  const calendar: Record<CalendarGroupKey, CalendarItem[]> = {
+    overdue: [],
+    today: [],
+    week: [],
+    later: [],
+  };
+
+  const activeAssignments = assignments.filter(
+    (assignment) =>
+      assignment.status !== "submitted" && assignment.status !== "done"
+  ).length;
+  const submittedAssignments = assignments.filter(
+    (assignment) =>
+      assignment.status === "submitted" || assignment.status === "done"
+  ).length;
+  const examProgress = exams.length
+    ? Math.round(
+        exams.reduce((total, exam) => total + (exam.progress ?? 0), 0) /
+          exams.length
+      )
+    : 0;
+  const chapterStatuses = Object.values(diplomaChapters);
+  const diplomaProgress = chapterStatuses.length
+    ? Math.round(
+        (chapterStatuses.filter(
+          (status) => status === "reviewed" || status === "completed"
+        ).length /
+          chapterStatuses.length) *
+          100
+      )
+    : 0;
+  const dueAssignments = assignments.filter((assignment) =>
+    Boolean(getAssignmentDeadline(assignment))
+  );
+
+  for (const assignment of dueAssignments) {
+    const dueTime = parseTime(getAssignmentDeadline(assignment));
+    if (!dueTime) continue;
+
+    const dueDate = startOfDay(new Date(dueTime));
+    const item = {
+      id: String(assignment.id ?? getAssignmentTitle(assignment)),
+      title: getAssignmentTitle(assignment),
+      due: formatShortDate(getAssignmentDeadline(assignment), language),
+      href: getAssignmentHref(assignment),
+    };
+
+    if (dueDate < now && assignment.status !== "submitted") {
+      calendar.overdue.push(item);
+    } else if (dateKey(dueDate) === dateKey(now)) {
+      calendar.today.push(item);
+    } else if (dueDate <= weekEnd) {
+      calendar.week.push(item);
+    } else {
+      calendar.later.push(item);
+    }
+  }
+
+  const completedThisWeek =
+    assignments.filter((assignment) => {
+      if (assignment.status !== "submitted" && assignment.status !== "done") {
+        return false;
+      }
+
+      const time = parseTime(getAssignmentTime(assignment));
+      return time >= weekStart.getTime() && time <= weekEnd.getTime();
+    }).length +
+    chapterStatuses.filter((status) => status === "completed").length;
+
+  const assignmentActivities = assignments.map((assignment) => ({
+    title: getAssignmentTitle(assignment),
+    time: formatShortDate(getAssignmentTime(assignment), language),
+    tag: "assignment",
+    icon: "A",
+    sortTime: parseTime(getAssignmentTime(assignment)),
+  }));
+  const fileActivities = files.map((file) => ({
+    title: file.title?.trim() || file.name?.trim() || "File",
+    time: formatShortDate(file.date || file.uploadedAt || file.createdAt, language),
+    tag: "file",
+    icon: "F",
+    sortTime: parseTime(file.date || file.uploadedAt || file.createdAt),
+  }));
+  const documentActivities = documents.map((document) => ({
+    title: document.title?.trim() || "Document",
+    time: formatShortDate(document.updatedAt || document.createdAt, language),
+    tag: "document",
+    icon: "D",
+    sortTime: parseTime(document.updatedAt || document.createdAt),
+  }));
+
+  const deadlines = assignments
+    .filter((assignment) => Boolean(getAssignmentDeadline(assignment)))
+    .sort(
+      (first, second) =>
+        parseTime(getAssignmentDeadline(first)) -
+        parseTime(getAssignmentDeadline(second))
+    )
+    .slice(0, 3)
+    .map((assignment) => ({
+      title: getAssignmentTitle(assignment),
+      due: formatShortDate(getAssignmentDeadline(assignment), language),
+      href: getAssignmentHref(assignment),
+      date: formatShortDate(getAssignmentDeadline(assignment), language),
+    }));
+
+  return {
+    activeAssignments,
+    submittedAssignments,
+    documents: documents.length,
+    files: files.length,
+    examProgress,
+    diplomaProgress,
+    dueThisWeek: calendar.today.length + calendar.week.length,
+    overdue: calendar.overdue.length,
+    studyStreak: readStudyProgress().streak,
+    completedThisWeek,
+    activities: [
+      ...assignmentActivities,
+      ...fileActivities,
+      ...documentActivities,
+    ]
+      .sort((first, second) => second.sortTime - first.sortTime)
+      .slice(0, 4)
+      .map((activity) => ({
+        title: activity.title,
+        time: activity.time,
+        tag: activity.tag,
+        icon: activity.icon,
+      })),
+    deadlines,
+    calendar,
+  };
+}
 
 function getStoredLanguage(): Language {
   if (typeof window === "undefined") return "ru";
@@ -465,13 +967,38 @@ function getStoredTheme(): Theme {
 function DashboardContent() {
   const [language, setLanguage] = useState<Language>("ru");
   const [theme, setTheme] = useState<Theme>("dark");
+  const [snapshot, setSnapshot] = useState<DashboardSnapshot>(emptySnapshot);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingForm, setOnboardingForm] = useState({
+    university: "",
+    program: "",
+    studyLevel: "",
+    studyGoal: "",
+  });
 
   const t = copy[language];
+  const onboarding = onboardingCopy[language];
+  const progressText = progressCopy[language];
   const isDark = theme === "dark";
 
   useEffect(() => {
-    setLanguage(getStoredLanguage());
+    const storedLanguage = getStoredLanguage();
+    const profile = readLocalProfile();
+    const onboardingState = readRecord(onboardingStorageKey);
+
+    setLanguage(storedLanguage);
     setTheme(getStoredTheme());
+    touchStudyProgress();
+    setSnapshot(readDashboardSnapshot(storedLanguage));
+    setOnboardingForm({
+      university: profile.university ?? "",
+      program: profile.program ?? "",
+      studyLevel: profile.studyLevel ?? "",
+      studyGoal: profile.studyGoal ?? "",
+    });
+    setShowOnboarding(
+      onboardingState.completed !== true && onboardingState.skipped !== true
+    );
 
     function handleLanguageChange(event: Event) {
       const customEvent = event as CustomEvent<Language>;
@@ -482,6 +1009,7 @@ function DashboardContent() {
         customEvent.detail === "kz"
       ) {
         setLanguage(customEvent.detail);
+        setSnapshot(readDashboardSnapshot(customEvent.detail));
       }
     }
 
@@ -494,14 +1022,18 @@ function DashboardContent() {
     }
 
     function handleStorageChange() {
-      setLanguage(getStoredLanguage());
+      const nextLanguage = getStoredLanguage();
+
+      setLanguage(nextLanguage);
       setTheme(getStoredTheme());
+      setSnapshot(readDashboardSnapshot(nextLanguage));
     }
 
     window.addEventListener("studyai:language-change", handleLanguageChange);
     window.addEventListener("studyai:theme-change", handleThemeChange);
     window.addEventListener("studyai:profile-change", handleStorageChange);
     window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("focus", handleStorageChange);
 
     return () => {
       window.removeEventListener(
@@ -511,8 +1043,48 @@ function DashboardContent() {
       window.removeEventListener("studyai:theme-change", handleThemeChange);
       window.removeEventListener("studyai:profile-change", handleStorageChange);
       window.removeEventListener("storage", handleStorageChange);
+    window.removeEventListener("focus", handleStorageChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (!showOnboarding) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        window.localStorage.setItem(
+          onboardingStorageKey,
+          JSON.stringify({ skipped: true, skippedAt: new Date().toISOString() })
+        );
+        setShowOnboarding(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showOnboarding]);
+
+  function saveOnboarding() {
+    saveLocalProfile({
+      university: onboardingForm.university.trim(),
+      program: onboardingForm.program.trim(),
+      studyLevel: onboardingForm.studyLevel.trim(),
+      studyGoal: onboardingForm.studyGoal.trim(),
+    });
+    window.localStorage.setItem(
+      onboardingStorageKey,
+      JSON.stringify({ completed: true, completedAt: new Date().toISOString() })
+    );
+    setShowOnboarding(false);
+  }
+
+  function skipOnboarding() {
+    window.localStorage.setItem(
+      onboardingStorageKey,
+      JSON.stringify({ skipped: true, skippedAt: new Date().toISOString() })
+    );
+    setShowOnboarding(false);
+  }
 
   const quickActions = useMemo(
     () =>
@@ -529,12 +1101,31 @@ function DashboardContent() {
   const modules = useMemo(
     () =>
       [
-        t.modules.assignments,
-        t.modules.documents,
-        t.modules.examPrep,
-        t.modules.files,
+        {
+          ...t.modules.assignments,
+          stat: String(snapshot.activeAssignments),
+        },
+        {
+          ...t.modules.documents,
+          stat: String(snapshot.documents),
+        },
+        {
+          ...t.modules.examPrep,
+          stat: `${Math.max(snapshot.examProgress, snapshot.diplomaProgress)}%`,
+        },
+        {
+          ...t.modules.files,
+          stat: String(snapshot.files),
+        },
       ] as const,
-    [t]
+    [
+      snapshot.activeAssignments,
+      snapshot.diplomaProgress,
+      snapshot.documents,
+      snapshot.examProgress,
+      snapshot.files,
+      t,
+    ]
   );
 
   const activities = useMemo(
@@ -579,6 +1170,38 @@ function DashboardContent() {
     [isDark, t]
   );
 
+  const displayedActivities = useMemo(() => {
+    if (!snapshot.activities.length) return activities;
+
+    return snapshot.activities.map((activity, index) => ({
+      ...activity,
+      tag:
+        activity.tag === "assignment"
+          ? t.activityTags.assignment
+          : activity.tag === "document"
+          ? t.activityTags.document
+          : activity.tag === "file"
+          ? t.modules.files.title
+          : t.activityTags.examPrep,
+      color:
+        index % 4 === 0
+          ? isDark
+            ? "bg-blue-500/15 text-blue-300"
+            : "bg-blue-50 text-blue-700"
+          : index % 4 === 1
+          ? isDark
+            ? "bg-emerald-500/15 text-emerald-300"
+            : "bg-emerald-50 text-emerald-700"
+          : index % 4 === 2
+          ? isDark
+            ? "bg-violet-500/15 text-violet-300"
+            : "bg-violet-50 text-violet-700"
+          : isDark
+          ? "bg-orange-500/15 text-orange-300"
+          : "bg-orange-50 text-orange-700",
+    }));
+  }, [activities, isDark, snapshot.activities, t]);
+
   const deadlines = useMemo(
     () => [
       {
@@ -597,6 +1220,10 @@ function DashboardContent() {
     [t]
   );
 
+  const displayedDeadlines = snapshot.deadlines.length
+    ? snapshot.deadlines
+    : deadlines;
+
   const pageClass = isDark
     ? "min-h-full bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8"
     : "min-h-full bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8";
@@ -612,9 +1239,134 @@ function DashboardContent() {
   const titleClass = isDark ? "text-white" : "text-slate-950";
   const textClass = isDark ? "text-slate-300" : "text-slate-600";
   const mutedClass = isDark ? "text-slate-400" : "text-slate-500";
+  const inputClass = isDark
+    ? "border-white/10 bg-slate-950/70 text-white placeholder:text-slate-500 focus:border-blue-400 focus:ring-blue-500/10"
+    : "border-slate-200 bg-white text-slate-950 placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500/10";
+  const progressCards = [
+    {
+      label: progressText.streak,
+      value: `${snapshot.studyStreak || 1} ${progressText.days}`,
+    },
+    {
+      label: progressText.completed,
+      value: String(snapshot.completedThisWeek),
+    },
+    {
+      label: progressText.due,
+      value: String(snapshot.dueThisWeek),
+    },
+    {
+      label: progressText.overdue,
+      value: String(snapshot.overdue),
+    },
+  ];
+  const calendarGroupKeys: CalendarGroupKey[] = [
+    "overdue",
+    "today",
+    "week",
+    "later",
+  ];
 
   return (
     <div className={pageClass}>
+      {showOnboarding && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/70 p-4 sm:items-center">
+          <section
+            className={`max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] border p-5 shadow-2xl sm:p-6 ${cardClass}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studyai-onboarding-title"
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2
+                  id="studyai-onboarding-title"
+                  className={`text-2xl font-black ${titleClass}`}
+                >
+                  {onboarding.title}
+                </h2>
+                <p className={`mt-2 text-sm leading-6 ${mutedClass}`}>
+                  {onboarding.subtitle}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={skipOnboarding}
+                className={`inline-flex h-10 items-center justify-center rounded-2xl border px-4 text-sm font-black ${
+                  isDark
+                    ? "border-white/10 text-slate-200 hover:bg-white/10"
+                    : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {onboarding.skip}
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {(
+                [
+                  ["university", onboarding.university, onboarding.universityPlaceholder],
+                  ["program", onboarding.program, onboarding.programPlaceholder],
+                  ["studyLevel", onboarding.level, onboarding.levelPlaceholder],
+                  ["studyGoal", onboarding.goal, onboarding.goalPlaceholder],
+                ] as const
+              ).map(([key, label, placeholder]) => (
+                <label key={key} className="grid gap-2 text-sm font-black">
+                  {label}
+                  <input
+                    value={onboardingForm[key]}
+                    onChange={(event) =>
+                      setOnboardingForm((current) => ({
+                        ...current,
+                        [key]: event.target.value,
+                      }))
+                    }
+                    placeholder={placeholder}
+                    className={`h-11 rounded-2xl border px-4 text-sm font-medium outline-none transition focus:ring-4 ${inputClass}`}
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className={`mt-5 rounded-3xl border p-4 ${softCardClass}`}>
+              <p className={`text-sm font-black ${titleClass}`}>
+                {onboarding.quickStart}
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {[
+                  [onboarding.assignment, "/assignments"],
+                  [onboarding.file, "/files"],
+                  [onboarding.exam, "/exam-prep"],
+                  [onboarding.tutor, "/ai-tutor"],
+                ].map(([label, href]) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={saveOnboarding}
+                    className={`inline-flex h-10 items-center justify-center rounded-2xl border px-4 text-sm font-black ${
+                      isDark
+                        ? "border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={saveOnboarding}
+              className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white transition hover:bg-blue-700 sm:w-auto"
+            >
+              {onboarding.save}
+            </button>
+          </section>
+        </div>
+      )}
+
       <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section
           className={`min-w-0 overflow-hidden rounded-[2rem] border p-5 sm:p-6 lg:p-8 ${cardClass}`}
@@ -751,6 +1503,92 @@ function DashboardContent() {
             ))}
           </div>
 
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {progressCards.map((item) => (
+              <div
+                key={item.label}
+                className={`min-w-0 rounded-[1.5rem] border p-4 ${cardClass}`}
+              >
+                <p className={`text-sm font-bold ${mutedClass}`}>{item.label}</p>
+                <p className={`mt-2 text-2xl font-black ${titleClass}`}>
+                  {item.value}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <section
+            className={`mt-6 min-w-0 overflow-hidden rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className={`text-xl font-black ${titleClass}`}>
+                  {progressText.calendar}
+                </h2>
+                <p className={`mt-1 text-sm leading-6 ${mutedClass}`}>
+                  {progressText.calendarSubtitle}
+                </p>
+              </div>
+              <Link
+                href="/assignments"
+                className="shrink-0 text-sm font-black text-blue-600 hover:text-blue-700"
+              >
+                {t.viewAll}
+              </Link>
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-4">
+              {calendarGroupKeys.map((group) => (
+                <div
+                  key={group}
+                  className={`min-w-0 rounded-[1.5rem] border p-4 ${softCardClass}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className={`text-sm font-black ${titleClass}`}>
+                      {progressText.groups[group]}
+                    </h3>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-black ${
+                        isDark
+                          ? "bg-slate-800 text-slate-200"
+                          : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      {snapshot.calendar[group].length}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-2">
+                    {snapshot.calendar[group].length ? (
+                      snapshot.calendar[group].slice(0, 3).map((item) => (
+                        <Link
+                          key={`${group}-${item.id}`}
+                          href={item.href}
+                          className={`rounded-2xl border p-3 transition ${
+                            isDark
+                              ? "border-white/10 bg-slate-950/60 hover:bg-white/10"
+                              : "border-slate-200 bg-white hover:bg-slate-50"
+                          }`}
+                        >
+                          <p className={`truncate text-sm font-black ${titleClass}`}>
+                            {item.title}
+                          </p>
+                          <p className={`mt-1 text-xs font-semibold ${mutedClass}`}>
+                            {item.due}
+                          </p>
+                        </Link>
+                      ))
+                    ) : (
+                      <p className={`text-sm leading-6 ${mutedClass}`}>
+                        {progressText.empty}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
             <section
               className={`min-w-0 overflow-hidden rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}
@@ -774,7 +1612,7 @@ function DashboardContent() {
               </div>
 
               <div className="mt-5 grid gap-3">
-                {activities.map((item) => (
+                {displayedActivities.map((item) => (
                   <div
                     key={item.title}
                     className={`min-w-0 rounded-[1.5rem] border p-4 ${softCardClass}`}
@@ -836,7 +1674,7 @@ function DashboardContent() {
               </div>
 
               <div className="mt-5 grid gap-3">
-                {deadlines.map((item) => (
+                {displayedDeadlines.map((item) => (
                   <div
                     key={item.title}
                     className={`min-w-0 overflow-hidden rounded-[1.5rem] border p-4 ${softCardClass}`}

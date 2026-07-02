@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Noto_Sans } from "next/font/google";
+import AuthGuard from "@/components/AuthGuard";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import "./globals.css";
 
@@ -32,7 +33,9 @@ export default function RootLayout({
       className={`${notoSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body suppressHydrationWarning className="min-h-full font-sans">
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider>
+          <AuthGuard>{children}</AuthGuard>
+        </LanguageProvider>
       </body>
     </html>
   );

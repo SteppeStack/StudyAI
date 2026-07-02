@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { formatUsdPrice } from "@/lib/pricing";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -80,7 +81,7 @@ const copy: Record<Language, Copy> = {
     priority: "Priority features",
     paymentNoteTitle: "Secure payment preview",
     paymentNoteText:
-      "Payment integration will be connected later through backend/API. For now, this is a frontend subscription preview.",
+      "Payments are currently preview-only. Payment integration will be connected later through backend/API.",
     manageTitle: "Manage your plan",
     manageSubtitle:
       "View billing options, compare plans, and upgrade when you need more AI credits.",
@@ -124,8 +125,8 @@ const copy: Record<Language, Copy> = {
     },
   },
   ru: {
-    pageBadge: "StudyAI Plans",
-    heroTitle: "Улучши свой учебный workspace",
+    pageBadge: "Планы StudyAI",
+    heroTitle: "Улучши свое учебное пространство",
     heroSubtitle:
       "Получай больше AI-кредитов, продвинутые учебные инструменты, генерацию документов, подготовку к экзаменам и обучение на основе файлов.",
     monthly: "Ежемесячно",
@@ -137,7 +138,7 @@ const copy: Record<Language, Copy> = {
     upgradeTo: "Перейти на",
     planComparison: "Сравнение планов",
     planComparisonSubtitle:
-      "Выбери план, который подходит твоему учебному workflow.",
+      "Выбери план, который подходит твоему учебному процессу.",
     included: "Есть",
     notIncluded: "Нет",
     credits: "AI-кредиты",
@@ -148,17 +149,17 @@ const copy: Record<Language, Copy> = {
     priority: "Приоритетные функции",
     paymentNoteTitle: "Безопасная оплата",
     paymentNoteText:
-      "Интеграция оплаты будет подключена позже через backend/API. Сейчас это frontend-preview подписки.",
+      "Платежи пока работают в preview-режиме. Интеграция оплаты будет подключена позже через сервер/API.",
     manageTitle: "Управление планом",
     manageSubtitle:
       "Смотри варианты оплаты, сравнивай планы и улучшай подписку, когда нужно больше AI-кредитов.",
     manageBilling: "Перейти к оплате",
     plans: {
       free: {
-        name: "Free",
+        name: "Бесплатно",
         description: "Для знакомства со StudyAI и базовых учебных инструментов.",
         features: [
-          "Базовый доступ к AI Tutor",
+          "Базовый доступ к AI-наставнику",
           "Ограниченные черновики документов",
           "Базовая помощь с заданиями",
           "Ручная организация файлов",
@@ -174,7 +175,7 @@ const copy: Record<Language, Copy> = {
           "Продвинутая обратная связь по заданиям",
           "Планы подготовки и тесты к экзаменам",
           "Учёба на основе загруженных файлов",
-          "Приоритетные функции workspace",
+          "Приоритетные функции пространства",
         ],
       },
       premium: {
@@ -182,19 +183,19 @@ const copy: Record<Language, Copy> = {
         description:
           "Для интенсивной учёбы, дипломной работы и периода экзаменов.",
         features: [
-          "Максимальное использование AI Tutor",
+          "Максимальное использование AI-наставника",
           "Длинная генерация документов",
           "Поддержка дипломного ассистента",
           "Продвинутая подготовка к экзаменам",
           "Большое файловое пространство",
-          "Будущие premium AI-инструменты",
+          "Будущие премиум AI-инструменты",
         ],
       },
     },
   },
   kz: {
-    pageBadge: "StudyAI Plans",
-    heroTitle: "Оқу workspace деңгейін көтеріңіз",
+    pageBadge: "StudyAI жоспарлары",
+    heroTitle: "Оқу кеңістігінің деңгейін көтеріңіз",
     heroSubtitle:
       "Көбірек AI-кредиттер, кеңейтілген оқу құралдары, құжат генерациясы, емтиханға дайындық және файлдарға негізделген оқу мүмкіндіктерін алыңыз.",
     monthly: "Ай сайын",
@@ -206,7 +207,7 @@ const copy: Record<Language, Copy> = {
     upgradeTo: "Көшу:",
     planComparison: "Жоспарларды салыстыру",
     planComparisonSubtitle:
-      "Оқу workflow үшін ыңғайлы жоспарды таңдаңыз.",
+      "Оқу процесі үшін ыңғайлы жоспарды таңдаңыз.",
     included: "Бар",
     notIncluded: "Жоқ",
     credits: "AI-кредиттер",
@@ -215,20 +216,20 @@ const copy: Record<Language, Copy> = {
     examPrep: "Емтихандар",
     files: "Файлдар",
     priority: "Приоритет функциялар",
-    paymentNoteTitle: "Қауіпсіз төлем preview",
+    paymentNoteTitle: "Қауіпсіз төлем preview режимі",
     paymentNoteText:
-      "Төлем интеграциясы кейін backend/API арқылы қосылады. Қазір бұл subscription frontend-preview.",
+      "Төлемдер әзірге preview режимінде жұмыс істейді. Төлем интеграциясы кейін сервер/API арқылы қосылады.",
     manageTitle: "Жоспарды басқару",
     manageSubtitle:
       "Төлем нұсқаларын қарап, жоспарларды салыстырып, көбірек AI-кредит қажет болғанда жаңартыңыз.",
     manageBilling: "Төлемге өту",
     plans: {
       free: {
-        name: "Free",
+        name: "Тегін",
         description:
           "StudyAI-ды сынап көру және базалық оқу құралдарын қолдану үшін.",
         features: [
-          "AI Tutor базалық қолжетімділігі",
+          "AI-тәлімгер базалық қолжетімділігі",
           "Шектеулі құжат черновиктері",
           "Тапсырмаларға базалық көмек",
           "Файлдарды қолмен ұйымдастыру",
@@ -245,7 +246,7 @@ const copy: Record<Language, Copy> = {
           "Тапсырмаларға кеңейтілген feedback",
           "Емтихан жоспарлары және тесттер",
           "Файлдарға негізделген оқу",
-          "Workspace приоритет функциялары",
+          "Кеңістіктің приоритет функциялары",
         ],
       },
       premium: {
@@ -253,11 +254,11 @@ const copy: Record<Language, Copy> = {
         description:
           "Интенсивті оқу, диплом жұмысы және емтихан кезеңдері үшін.",
         features: [
-          "AI Tutor максималды қолдану",
+          "AI-тәлімгерді максималды қолдану",
           "Ұзақ құжат генерациясы",
           "Диплом ассистенті",
           "Кеңейтілген емтихан дайындығы",
-          "Үлкен файл workspace",
+          "Үлкен файл кеңістігі",
           "Болашақ premium AI құралдары",
         ],
       },
@@ -269,23 +270,23 @@ const plans: Plan[] = [
   {
     key: "free",
     icon: "🌱",
-    monthlyPrice: "€0",
-    yearlyPrice: "€0",
+    monthlyPrice: formatUsdPrice("free", "monthly"),
+    yearlyPrice: formatUsdPrice("free", "yearly"),
     credits: "100",
   },
   {
     key: "pro",
     icon: "⚡",
-    monthlyPrice: "$7.99",
-    yearlyPrice: "€76.70",
+    monthlyPrice: formatUsdPrice("pro", "monthly"),
+    yearlyPrice: formatUsdPrice("pro", "yearly"),
     credits: "4,000",
     popular: true,
   },
   {
     key: "premium",
     icon: "🚀",
-    monthlyPrice: "€14.99",
-    yearlyPrice: "€143.90",
+    monthlyPrice: formatUsdPrice("premium", "monthly"),
+    yearlyPrice: formatUsdPrice("premium", "yearly"),
     credits: "10,000",
   },
 ];
@@ -337,6 +338,22 @@ const languageStorageKeys = [
 ];
 
 const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
+const planPreviewStorageKey = "studyai-subscription-preview";
+
+const subscriptionExtraCopy = {
+  en: {
+    selected: "Preview selected",
+    toast: "Plan preview selected. Payment provider will be connected later.",
+  },
+  ru: {
+    selected: "Предпросмотр выбран",
+    toast: "Предпросмотр плана выбран. Платежный провайдер будет подключен позже.",
+  },
+  kz: {
+    selected: "Алдын ала көру таңдалды",
+    toast: "Жоспарды алдын ала көру таңдалды. Төлем провайдері кейін қосылады.",
+  },
+} satisfies Record<Language, { selected: string; toast: string }>;
 
 function getStoredLanguage(): Language {
   if (typeof window === "undefined") return "ru";
@@ -387,13 +404,25 @@ function SubscriptionContent() {
   const [language, setLanguage] = useState<Language>("ru");
   const [theme, setTheme] = useState<Theme>("dark");
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
+  const [selectedPreviewPlan, setSelectedPreviewPlan] = useState<PlanKey>("free");
+  const [toast, setToast] = useState("");
 
   const t = copy[language];
+  const x = subscriptionExtraCopy[language];
   const isDark = theme === "dark";
 
   useEffect(() => {
     setLanguage(getStoredLanguage());
     setTheme(getStoredTheme());
+    const savedPreview = window.localStorage.getItem(planPreviewStorageKey);
+
+    if (
+      savedPreview === "free" ||
+      savedPreview === "pro" ||
+      savedPreview === "premium"
+    ) {
+      setSelectedPreviewPlan(savedPreview);
+    }
 
     function handleLanguageChange(event: Event) {
       const customEvent = event as CustomEvent<Language>;
@@ -434,6 +463,13 @@ function SubscriptionContent() {
     };
   }, []);
 
+  function selectPreviewPlan(plan: PlanKey) {
+    setSelectedPreviewPlan(plan);
+    window.localStorage.setItem(planPreviewStorageKey, plan);
+    setToast(x.toast);
+    window.setTimeout(() => setToast(""), 2600);
+  }
+
   const pageClass = isDark
     ? "min-h-full bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8"
     : "min-h-full bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8";
@@ -450,6 +486,12 @@ function SubscriptionContent() {
 
   return (
     <div className={pageClass}>
+      {toast && (
+        <div className="fixed right-4 top-4 z-50 max-w-sm rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20">
+          {toast}
+        </div>
+      )}
+
       <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6">
         <section
           className={`overflow-hidden rounded-[2rem] border p-5 sm:p-6 lg:p-8 ${cardClass}`}
@@ -518,6 +560,7 @@ function SubscriptionContent() {
             const periodLabel =
               billingPeriod === "monthly" ? t.perMonth : t.perYear;
             const isCurrentPlan = plan.key === "free";
+            const isSelectedPreview = selectedPreviewPlan === plan.key;
 
             return (
               <article
@@ -568,6 +611,7 @@ function SubscriptionContent() {
                       ? "/dashboard"
                       : `/payment?plan=${plan.key}&billing=${billingPeriod}`
                   }
+                  onClick={() => selectPreviewPlan(plan.key)}
                   className={`mt-6 inline-flex h-12 w-full items-center justify-center rounded-2xl border px-5 text-sm font-black transition ${
                     isCurrentPlan
                       ? isDark
@@ -577,7 +621,9 @@ function SubscriptionContent() {
                   }`}
                 >
                   {isCurrentPlan
-                    ? t.currentPlan
+                    ? isSelectedPreview
+                      ? x.selected
+                      : t.currentPlan
                     : `${t.upgradeTo} ${planCopy.name}`}
                 </Link>
 
@@ -617,13 +663,13 @@ function SubscriptionContent() {
                       Feature
                     </th>
                     <th className={`px-4 py-2 text-left text-sm ${mutedClass}`}>
-                      Free
+                      {t.plans.free.name}
                     </th>
                     <th className={`px-4 py-2 text-left text-sm ${mutedClass}`}>
-                      Pro
+                      {t.plans.pro.name}
                     </th>
                     <th className={`px-4 py-2 text-left text-sm ${mutedClass}`}>
-                      Premium
+                      {t.plans.premium.name}
                     </th>
                   </tr>
                 </thead>

@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "@/components/AppShell";
+import {
+  analyzeFile,
+  createFileSignedUrl,
+  deleteFile,
+  listFiles,
+  uploadFile,
+  type UserFile,
+} from "@/lib/studyApi";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -10,13 +18,15 @@ type FileStatus = "ready" | "saved" | "processing";
 type FilterKey = "all" | FileCategory;
 
 type FileItem = {
-  id: number;
-  titleKey: "databaseNotes" | "researchDraft" | "formulaSheet" | "whiteboard";
+  id: string;
+  title: string;
   category: FileCategory;
   size: string;
-  dateKey: "today" | "yesterday" | "may18" | "may17";
+  date: string;
   status: FileStatus;
   icon: string;
+  source: "api" | "local" | "demo";
+  analysis?: string;
 };
 
 type FolderItem = {
@@ -46,14 +56,23 @@ type Copy = {
   open: string;
   download: string;
   remove: string;
+  analyze: string;
+  analyzing: string;
+  uploading: string;
+  localBanner: string;
+  demoBanner: string;
+  apiBanner: string;
+  unsupportedFile: string;
+  localOpenUnavailable: string;
+  deleted: string;
+  uploaded: string;
+  analysisReady: string;
   all: string;
   files: string;
   noFilesTitle: string;
   noFilesSubtitle: string;
   categories: Record<FileCategory, string>;
   statuses: Record<FileStatus, string>;
-  titles: Record<FileItem["titleKey"], string>;
-  dates: Record<FileItem["dateKey"], string>;
 };
 
 const copy: Record<Language, Copy> = {
@@ -80,6 +99,20 @@ const copy: Record<Language, Copy> = {
     open: "Open",
     download: "Download",
     remove: "Remove",
+    analyze: "Analyze",
+    analyzing: "Analyzing...",
+    uploading: "Uploading...",
+    localBanner:
+      "Backend is unavailable. File metadata is saved locally in this browser.",
+    demoBanner:
+      "Demo files are shown because backend is unavailable and no local files exist yet.",
+    apiBanner: "Live API files are connected.",
+    unsupportedFile: "Unsupported file type.",
+    localOpenUnavailable:
+      "Local preview metadata cannot reopen files after refresh without backend storage.",
+    deleted: "File removed.",
+    uploaded: "File added.",
+    analysisReady: "Analysis preview is ready.",
     all: "All",
     files: "files",
     noFilesTitle: "No files found",
@@ -94,18 +127,6 @@ const copy: Record<Language, Copy> = {
       ready: "Ready",
       saved: "Saved",
       processing: "Processing",
-    },
-    titles: {
-      databaseNotes: "Database Systems Lecture Notes.pdf",
-      researchDraft: "Research Paper Draft.docx",
-      formulaSheet: "Exam Formula Sheet.png",
-      whiteboard: "Whiteboard Screenshot.jpg",
-    },
-    dates: {
-      today: "Today",
-      yesterday: "Yesterday",
-      may18: "18.05.26",
-      may17: "17.05.26",
     },
   },
   ru: {
@@ -131,6 +152,20 @@ const copy: Record<Language, Copy> = {
     open: "Открыть",
     download: "Скачать",
     remove: "Удалить",
+    analyze: "Анализ",
+    analyzing: "Анализ...",
+    uploading: "Загрузка...",
+    localBanner:
+      "Backend недоступен. Метаданные файлов сохраняются локально в этом браузере.",
+    demoBanner:
+      "Показаны demo-файлы, потому что backend недоступен и локальных файлов пока нет.",
+    apiBanner: "Подключены live-файлы из API.",
+    unsupportedFile: "Неподдерживаемый тип файла.",
+    localOpenUnavailable:
+      "Локальный preview хранит только метаданные и не сможет открыть файл после refresh без backend storage.",
+    deleted: "Файл удалён.",
+    uploaded: "Файл добавлен.",
+    analysisReady: "Preview анализа готов.",
     all: "Все",
     files: "файлов",
     noFilesTitle: "Файлы не найдены",
@@ -145,18 +180,6 @@ const copy: Record<Language, Copy> = {
       ready: "Готово",
       saved: "Сохранено",
       processing: "Обработка",
-    },
-    titles: {
-      databaseNotes: "Лекции по Database Systems.pdf",
-      researchDraft: "Черновик исследовательской работы.docx",
-      formulaSheet: "Формулы к экзамену.png",
-      whiteboard: "Скриншот доски.jpg",
-    },
-    dates: {
-      today: "Сегодня",
-      yesterday: "Вчера",
-      may18: "18.05.26",
-      may17: "17.05.26",
     },
   },
   kz: {
@@ -182,6 +205,20 @@ const copy: Record<Language, Copy> = {
     open: "Ашу",
     download: "Жүктеу",
     remove: "Жою",
+    analyze: "Талдау",
+    analyzing: "Талдау...",
+    uploading: "Жүктелуде...",
+    localBanner:
+      "Backend қолжетімсіз. Файл метадеректері осы браузерде жергілікті сақталады.",
+    demoBanner:
+      "Backend қолжетімсіз және жергілікті файлдар жоқ болғандықтан demo-файлдар көрсетілді.",
+    apiBanner: "API арқылы live файлдар қосылған.",
+    unsupportedFile: "Қолдау көрсетілмейтін файл түрі.",
+    localOpenUnavailable:
+      "Local preview тек метадеректерді сақтайды, backend storage болмаса refresh кейін файл ашылмайды.",
+    deleted: "Файл жойылды.",
+    uploaded: "Файл қосылды.",
+    analysisReady: "Талдау preview дайын.",
     all: "Барлығы",
     files: "файл",
     noFilesTitle: "Файлдар табылмады",
@@ -197,18 +234,6 @@ const copy: Record<Language, Copy> = {
       saved: "Сақталды",
       processing: "Өңделуде",
     },
-    titles: {
-      databaseNotes: "Database Systems лекциялары.pdf",
-      researchDraft: "Зерттеу жұмысының черновигі.docx",
-      formulaSheet: "Емтихан формулалары.png",
-      whiteboard: "Тақта скриншоты.jpg",
-    },
-    dates: {
-      today: "Бүгін",
-      yesterday: "Кеше",
-      may18: "18.05.26",
-      may17: "17.05.26",
-    },
   },
 };
 
@@ -220,43 +245,63 @@ const languageStorageKeys = [
 ];
 
 const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
+const localFilesStorageKey = "studyai-local-files";
+const allowedExtensions = [
+  "pdf",
+  "doc",
+  "docx",
+  "txt",
+  "md",
+  "ppt",
+  "pptx",
+  "xls",
+  "xlsx",
+  "csv",
+  "png",
+  "jpg",
+  "jpeg",
+];
 
-const fileItems: FileItem[] = [
+const demoFiles: FileItem[] = [
   {
-    id: 1,
-    titleKey: "databaseNotes",
+    id: "demo-database-notes",
+    title: "Database Systems Lecture Notes.pdf",
     category: "notes",
     size: "2.4 MB",
-    dateKey: "today",
+    date: "Today",
     status: "ready",
     icon: "📄",
+    source: "demo",
   },
   {
-    id: 2,
-    titleKey: "researchDraft",
+    id: "demo-research-draft",
+    title: "Research Paper Draft.docx",
     category: "documents",
     size: "860 KB",
-    dateKey: "yesterday",
+    date: "Yesterday",
     status: "saved",
     icon: "📝",
+    source: "demo",
   },
   {
-    id: 3,
-    titleKey: "formulaSheet",
+    id: "demo-formula-sheet",
+    title: "Exam Formula Sheet.png",
     category: "examMaterials",
     size: "1.1 MB",
-    dateKey: "may18",
+    date: "18.05.26",
     status: "processing",
     icon: "🎯",
+    source: "demo",
   },
   {
-    id: 4,
-    titleKey: "whiteboard",
+    id: "demo-whiteboard",
+    title: "Whiteboard Screenshot.jpg",
     category: "images",
     size: "740 KB",
-    dateKey: "may17",
+    date: "17.05.26",
     status: "ready",
     icon: "🖼️",
+    source: "demo",
   },
 ];
 
@@ -282,6 +327,86 @@ const folderItems: FolderItem[] = [
     icon: "🖼️",
   },
 ];
+
+function getExtension(fileName: string) {
+  return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function isAllowedFile(file: File) {
+  return allowedExtensions.includes(getExtension(file.name));
+}
+
+function getCategory(fileName: string): FileCategory {
+  const extension = getExtension(fileName);
+
+  if (["png", "jpg", "jpeg"].includes(extension)) return "images";
+  if (["ppt", "pptx", "xls", "xlsx", "csv"].includes(extension)) {
+    return "examMaterials";
+  }
+  if (["pdf", "doc", "docx"].includes(extension)) return "documents";
+
+  return "notes";
+}
+
+function getFileIcon(category: FileCategory) {
+  if (category === "images") return "🖼️";
+  if (category === "examMaterials") return "🎯";
+  if (category === "documents") return "📄";
+  return "📝";
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function todayLabel() {
+  return new Date().toLocaleDateString("de-DE");
+}
+
+function readLocalFiles() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(localFilesStorageKey);
+    if (!raw) return [];
+    return (JSON.parse(raw) as FileItem[]).map((file) => ({
+      ...file,
+      source: "local" as const,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalFiles(files: FileItem[]) {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(
+    localFilesStorageKey,
+    JSON.stringify(
+      files
+        .filter((file) => file.source !== "demo")
+        .map((file) => ({ ...file, source: "local" as const }))
+    )
+  );
+}
+
+function fileFromApi(file: UserFile): FileItem {
+  const category = getCategory(file.original_name);
+
+  return {
+    id: file.id,
+    title: file.original_name || "Untitled file",
+    category,
+    size: formatBytes(file.size_bytes),
+    date: file.created_at ? new Date(file.created_at).toLocaleDateString("de-DE") : todayLabel(),
+    status: file.status === "processing" ? "processing" : "ready",
+    icon: getFileIcon(category),
+    source: "api",
+  };
+}
 
 function getStoredLanguage(): Language {
   if (typeof window === "undefined") return "ru";
@@ -332,15 +457,46 @@ function getStatusColor(status: FileStatus, isDark: boolean) {
 function FilesContent() {
   const [language, setLanguage] = useState<Language>("ru");
   const [theme, setTheme] = useState<Theme>("dark");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [dataMode, setDataMode] = useState<"api" | "local" | "demo">("demo");
+  const [uploading, setUploading] = useState(false);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [toast, setToast] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
 
   const t = copy[language];
   const isDark = theme === "dark";
 
+  function showTransientToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 3200);
+  }
+
   useEffect(() => {
     setLanguage(getStoredLanguage());
     setTheme(getStoredTheme());
+
+    async function loadInitialFiles() {
+      try {
+        const apiFiles = await listFiles();
+        setFiles(apiFiles.map(fileFromApi));
+        setDataMode("api");
+      } catch {
+        const localFiles = readLocalFiles();
+
+        if (localFiles.length > 0) {
+          setFiles(localFiles);
+          setDataMode("local");
+        } else {
+          setFiles(demoFiles);
+          setDataMode("demo");
+        }
+      }
+    }
+
+    loadInitialFiles();
 
     function handleLanguageChange(event: Event) {
       const customEvent = event as CustomEvent<Language>;
@@ -381,17 +537,155 @@ function FilesContent() {
     };
   }, []);
 
+  function persistLocalFiles(nextFiles: FileItem[]) {
+    setFiles(nextFiles);
+    setDataMode("local");
+    saveLocalFiles(nextFiles);
+  }
+
+  async function handleFileSelect(fileList: FileList | null) {
+    if (!fileList?.length) return;
+
+    const selectedFiles = Array.from(fileList);
+    const unsupportedFile = selectedFiles.find((file) => !isAllowedFile(file));
+
+    if (unsupportedFile) {
+      showTransientToast(`${t.unsupportedFile} ${unsupportedFile.name}`);
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      if (dataMode === "api") {
+        const uploaded = await Promise.all(selectedFiles.map((file) => uploadFile(file)));
+        setFiles((current) => [...uploaded.map(fileFromApi), ...current]);
+      } else {
+        const localFiles = selectedFiles.map((file) => {
+          const category = getCategory(file.name);
+          return {
+            id: `local-file-${Date.now()}-${file.name}`,
+            title: file.name,
+            category,
+            size: formatBytes(file.size),
+            date: todayLabel(),
+            status: "saved" as const,
+            icon: getFileIcon(category),
+            source: "local" as const,
+          };
+        });
+        persistLocalFiles([...localFiles, ...files.filter((file) => file.source !== "demo")]);
+      }
+
+      showTransientToast(t.uploaded);
+    } catch {
+      const localFiles = selectedFiles.map((file) => {
+        const category = getCategory(file.name);
+        return {
+          id: `local-file-${Date.now()}-${file.name}`,
+          title: file.name,
+          category,
+          size: formatBytes(file.size),
+          date: todayLabel(),
+          status: "saved" as const,
+          icon: getFileIcon(category),
+          source: "local" as const,
+        };
+      });
+      persistLocalFiles([...localFiles, ...readLocalFiles()]);
+      showTransientToast(t.localBanner);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleOpen(file: FileItem) {
+    if (file.source !== "api") {
+      showTransientToast(t.localOpenUnavailable);
+      return;
+    }
+
+    try {
+      const response = await createFileSignedUrl(file.id);
+      window.open(response.signed_url, "_blank", "noopener,noreferrer");
+    } catch {
+      showTransientToast(t.localOpenUnavailable);
+    }
+  }
+
+  async function handleDelete(file: FileItem) {
+    try {
+      if (file.source === "api") await deleteFile(file.id);
+    } catch {
+      // Local removal still keeps the UI usable if the backend is temporarily down.
+    }
+
+    const nextFiles = files.filter((item) => item.id !== file.id);
+    if (dataMode === "api") {
+      setFiles(nextFiles);
+    } else {
+      persistLocalFiles(nextFiles);
+    }
+    showTransientToast(t.deleted);
+  }
+
+  async function handleAnalyze(file: FileItem) {
+    setAnalyzingId(file.id);
+
+    try {
+      if (file.source === "api") {
+        const response = await analyzeFile(file.id, { action: "summarize" });
+        setFiles((current) =>
+          current.map((item) =>
+            item.id === file.id ? { ...item, analysis: response.result } : item
+          )
+        );
+      } else {
+        persistLocalFiles(
+          files.map((item) =>
+            item.id === file.id
+              ? {
+                  ...item,
+                  analysis:
+                    "Local preview: summarize the file, extract key terms, and prepare questions for review.",
+                }
+              : item
+          )
+        );
+      }
+
+      showTransientToast(t.analysisReady);
+    } catch {
+      persistLocalFiles(
+        files.map((item) =>
+          item.id === file.id
+            ? {
+                ...item,
+                analysis:
+                  "Local preview: summarize the file, extract key terms, and prepare questions for review.",
+              }
+            : item
+        )
+      );
+      showTransientToast(t.localBanner);
+    } finally {
+      setAnalyzingId(null);
+    }
+  }
+
   const filteredFiles = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return fileItems.filter((file) => {
+    return files.filter((file) => {
       const matchesFilter = filter === "all" || file.category === filter;
 
       const text = [
-        t.titles[file.titleKey],
+        file.title,
         t.categories[file.category],
         t.statuses[file.status],
         file.size,
+        file.date,
       ]
         .join(" ")
         .toLowerCase();
@@ -400,7 +694,17 @@ function FilesContent() {
 
       return matchesFilter && matchesSearch;
     });
-  }, [filter, search, t]);
+  }, [files, filter, search, t]);
+
+  const dynamicFolderItems = useMemo(() => {
+    return folderItems.map((folder) => ({
+      ...folder,
+      count: files.filter((file) => file.category === folder.key).length,
+    }));
+  }, [files]);
+
+  const bannerText =
+    dataMode === "api" ? t.apiBanner : dataMode === "local" ? t.localBanner : t.demoBanner;
 
   const pageClass = isDark
     ? "min-h-full bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8"
@@ -428,6 +732,11 @@ function FilesContent() {
 
   return (
     <div className={pageClass}>
+      {toast && (
+        <div className="fixed right-4 top-20 z-[70] w-[min(360px,calc(100vw-2rem))] rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-xl">
+          {toast}
+        </div>
+      )}
       <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6">
         <section
           className={`overflow-hidden rounded-[2rem] border p-5 sm:p-6 lg:p-8 ${cardClass}`}
@@ -489,6 +798,20 @@ function FilesContent() {
           </div>
         </section>
 
+        <section
+          className={`rounded-[1.5rem] border px-4 py-3 text-sm font-bold ${
+            dataMode === "api"
+              ? isDark
+                ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+                : "border-emerald-100 bg-emerald-50 text-emerald-700"
+              : isDark
+                ? "border-amber-400/20 bg-amber-400/10 text-amber-100"
+                : "border-amber-100 bg-amber-50 text-amber-800"
+          }`}
+        >
+          {bannerText}
+        </section>
+
         <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(340px,0.8fr)_minmax(0,1.2fr)]">
           <aside className="grid min-w-0 gap-6">
             <section className={`rounded-[2rem] border p-5 sm:p-6 ${cardClass}`}>
@@ -524,8 +847,15 @@ function FilesContent() {
                 </p>
 
                 <label className="mt-5 inline-flex h-12 cursor-pointer items-center justify-center rounded-2xl bg-blue-600 px-6 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700">
-                  {t.chooseFilesButton}
-                  <input type="file" multiple className="hidden" />
+                  {uploading ? t.uploading : t.chooseFilesButton}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept={allowedExtensions.map((extension) => `.${extension}`).join(",")}
+                    onChange={(event) => handleFileSelect(event.target.files)}
+                  />
                 </label>
               </div>
             </section>
@@ -540,7 +870,7 @@ function FilesContent() {
               </p>
 
               <div className="mt-5 grid gap-3">
-                {folderItems.map((folder) => {
+                {dynamicFolderItems.map((folder) => {
                   const active = filter === folder.key;
 
                   return (
@@ -647,12 +977,12 @@ function FilesContent() {
                           <h3
                             className={`break-words text-base font-black ${titleClass}`}
                           >
-                            {t.titles[file.titleKey]}
+                            {file.title}
                           </h3>
 
                           <p className={`mt-1 text-sm font-semibold ${mutedClass}`}>
                             {t.categories[file.category]} · {file.size} ·{" "}
-                            {t.dates[file.dateKey]}
+                            {file.date}
                           </p>
 
                           <span
@@ -669,6 +999,7 @@ function FilesContent() {
                       <div className="grid gap-2 sm:grid-cols-3 lg:shrink-0">
                         <button
                           type="button"
+                          onClick={() => handleOpen(file)}
                           className={`h-10 rounded-2xl px-4 text-sm font-black transition ${
                             isDark
                               ? "bg-blue-500/15 text-blue-200 hover:bg-blue-600 hover:text-white"
@@ -680,17 +1011,20 @@ function FilesContent() {
 
                         <button
                           type="button"
+                          onClick={() => handleAnalyze(file)}
+                          disabled={analyzingId === file.id}
                           className={`h-10 rounded-2xl px-4 text-sm font-black transition ${
                             isDark
                               ? "bg-slate-800 text-slate-200 hover:bg-white/10"
                               : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                           }`}
                         >
-                          {t.download}
+                          {analyzingId === file.id ? t.analyzing : t.analyze}
                         </button>
 
                         <button
                           type="button"
+                          onClick={() => handleDelete(file)}
                           className={`h-10 rounded-2xl px-4 text-sm font-black transition ${
                             isDark
                               ? "bg-red-500/10 text-red-300 hover:bg-red-600 hover:text-white"
@@ -701,6 +1035,13 @@ function FilesContent() {
                         </button>
                       </div>
                     </div>
+                    {file.analysis && (
+                      <div
+                        className={`mt-4 rounded-2xl border p-4 text-sm leading-6 ${softCardClass}`}
+                      >
+                        {file.analysis}
+                      </div>
+                    )}
                   </article>
                 ))
               ) : (

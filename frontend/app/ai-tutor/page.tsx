@@ -409,6 +409,55 @@ const recentPromptText: Record<
   },
 };
 
+const tutorExtraCopy = {
+  en: {
+    thinking: "Thinking...",
+    backendUnavailable:
+      "Backend is unavailable. Showing local preview response.",
+    retry: "Retry",
+    attachHint: "Use the Files page to upload and analyze study materials.",
+    fallbackPrefix: "Local preview",
+    fallbackBody:
+      "Break the question into definitions, key steps, one example, and a short practice check. When the backend is available, AI Tutor will provide a full generated answer.",
+  },
+  ru: {
+    thinking: "Думаю...",
+    backendUnavailable:
+      "Backend недоступен. Показан локальный предварительный ответ.",
+    retry: "Повторить",
+    attachHint: "Используй страницу Files, чтобы загрузить и проанализировать материалы.",
+    fallbackPrefix: "Локальный preview",
+    fallbackBody:
+      "Разбей вопрос на определения, ключевые шаги, один пример и короткую проверку. Когда backend будет доступен, AI Tutor даст полноценный сгенерированный ответ.",
+  },
+  kz: {
+    thinking: "Ойлануда...",
+    backendUnavailable:
+      "Backend қолжетімсіз. Жергілікті алдын ала жауап көрсетілді.",
+    retry: "Қайталау",
+    attachHint: "Оқу материалдарын жүктеу және талдау үшін Files бетін қолданыңыз.",
+    fallbackPrefix: "Жергілікті preview",
+    fallbackBody:
+      "Сұрақты анықтамаларға, негізгі қадамдарға, бір мысалға және қысқа тексеруге бөліңіз. Backend қолжетімді болғанда AI Tutor толық жауап береді.",
+  },
+} satisfies Record<
+  Language,
+  {
+    thinking: string;
+    backendUnavailable: string;
+    retry: string;
+    attachHint: string;
+    fallbackPrefix: string;
+    fallbackBody: string;
+  }
+>;
+
+function buildLocalTutorFallback(prompt: string, language: Language) {
+  const extra = tutorExtraCopy[language];
+
+  return `${extra.fallbackPrefix}: ${prompt}\n\n${extra.fallbackBody}`;
+}
+
 function getStoredLanguage(): Language {
   if (typeof window === "undefined") return "ru";
 
@@ -456,8 +505,10 @@ function TutorContent() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [usageLabel, setUsageLabel] = useState("");
+  const [lastFailedPrompt, setLastFailedPrompt] = useState("");
 
   const t = copy[language];
+  const extra = tutorExtraCopy[language];
   const isDark = theme === "dark";
 
   useEffect(() => {
@@ -574,16 +625,19 @@ function TutorContent() {
       setUsageLabel(
         `${response.usage.ai_requests_used} / ${response.usage.monthly_ai_request_limit}`
       );
-    } catch (sendError) {
-      setMessages((current) =>
-        current.filter((message) => message.id !== optimisticUserMessage.id)
-      );
-      setInput(trimmed);
-      setError(
-        sendError instanceof Error
-          ? sendError.message
-          : "Failed to send message."
-      );
+      setLastFailedPrompt("");
+    } catch {
+      setLastFailedPrompt(trimmed);
+      setMessages((current) => [
+        ...current,
+        {
+          id: `local-assistant-${Date.now()}`,
+          role: "assistant",
+          content: buildLocalTutorFallback(trimmed, language),
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      setError(extra.backendUnavailable);
     } finally {
       setSending(false);
     }
@@ -633,6 +687,7 @@ function TutorContent() {
                 setInput("");
                 setError("");
                 setUsageLabel("");
+                setLastFailedPrompt("");
               }}
               className={`inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border px-4 text-sm font-black transition ${
                 isDark
@@ -768,7 +823,7 @@ function TutorContent() {
                       className={`max-w-[680px] rounded-[1.5rem] border px-5 py-4 ${softCardClass}`}
                     >
                       <p className={`text-sm font-semibold ${mutedClass}`}>
-                        Thinking...
+                        {extra.thinking}
                       </p>
                     </div>
                   </div>
@@ -780,21 +835,22 @@ function TutorContent() {
           <div className="border-t border-slate-200 p-5 dark:border-white/10 sm:p-6">
             <form
               onSubmit={handleSubmit}
+              aria-label={t.chatTitle}
               className={`flex flex-col gap-3 rounded-3xl border p-3 sm:flex-row sm:items-center ${softCardClass}`}
             >
               <input
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 placeholder={t.inputPlaceholder}
+                aria-label={t.inputPlaceholder}
                 className={`h-12 min-w-0 flex-1 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
               />
 
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() =>
-                    setError("File attachments are available on the Files page.")
-                  }
+                  onClick={() => setError(extra.attachHint)}
+                  aria-label={t.attach}
                   className={`inline-flex h-12 flex-1 items-center justify-center rounded-2xl border px-4 text-sm font-black transition sm:flex-none ${
                     isDark
                       ? "border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10"
@@ -807,6 +863,7 @@ function TutorContent() {
                 <button
                   type="submit"
                   disabled={sending || !input.trim()}
+                  aria-label={t.send}
                   className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
                 >
                   {sending ? "..." : t.send}
@@ -817,7 +874,18 @@ function TutorContent() {
             {(error || usageLabel) && (
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 {error && (
-                  <p className="text-sm font-semibold text-red-500">{error}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-red-500">{error}</p>
+                    {lastFailedPrompt && (
+                      <button
+                        type="button"
+                        onClick={() => void sendMessage(lastFailedPrompt)}
+                        className="inline-flex h-9 items-center justify-center rounded-2xl bg-blue-600 px-4 text-xs font-black text-white transition hover:bg-blue-700"
+                      >
+                        {extra.retry}
+                      </button>
+                    )}
+                  </div>
                 )}
                 {usageLabel && (
                   <p className={`text-xs font-black ${mutedClass}`}>

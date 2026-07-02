@@ -6,7 +6,12 @@ import AppShell from "@/components/AppShell";
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
 type ResearchType = "mixed" | "quantitative" | "qualitative" | "theoretical";
-type ChapterStatus = "notStarted" | "inProgress" | "draftReady" | "reviewed";
+type ChapterStatus =
+  | "notStarted"
+  | "inProgress"
+  | "draftReady"
+  | "reviewed"
+  | "completed";
 
 type DiplomaForm = {
   topic: string;
@@ -17,6 +22,8 @@ type DiplomaForm = {
   researchType: ResearchType;
   researchGoal: string;
   objectives: string;
+  notes: string;
+  milestones: string;
 };
 
 type ChapterKey =
@@ -60,7 +67,7 @@ type Copy = {
   chaptersCompleted: string;
   progressHint: string;
   researchTypes: Record<ResearchType, string>;
-  statuses: Record<ChapterStatus, string>;
+  statuses: Partial<Record<ChapterStatus, string>>;
   structure: Record<ChapterKey, string>;
   chapterTitles: Record<ChapterKey, string>;
   tipsTitle: string;
@@ -319,6 +326,43 @@ const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 const diplomaStorageKey = "studyai-diploma-form";
 const chapterStorageKey = "studyai-diploma-chapters";
 
+const diplomaExtraCopy = {
+  en: {
+    notes: "Notes",
+    notesPlaceholder: "Supervisor feedback, open questions, or writing reminders...",
+    milestones: "Milestones",
+    milestonesPlaceholder: "e.g. Literature review by Friday, methodology draft next week...",
+    saved: "Saved locally because backend is unavailable.",
+    completed: "Completed",
+  },
+  ru: {
+    notes: "Заметки",
+    notesPlaceholder: "Комментарии руководителя, вопросы или напоминания по тексту...",
+    milestones: "Этапы",
+    milestonesPlaceholder: "например: обзор литературы до пятницы, методология на следующей неделе...",
+    saved: "Сохранено локально, потому что backend недоступен.",
+    completed: "Завершено",
+  },
+  kz: {
+    notes: "Жазбалар",
+    notesPlaceholder: "Жетекші пікірі, ашық сұрақтар немесе жазу ескертпелері...",
+    milestones: "Кезеңдер",
+    milestonesPlaceholder: "мысалы: әдебиет шолуы жұмаға дейін, әдістеме келесі аптада...",
+    saved: "Backend қолжетімсіз болғандықтан жергілікті түрде сақталды.",
+    completed: "Аяқталды",
+  },
+} satisfies Record<
+  Language,
+  {
+    notes: string;
+    notesPlaceholder: string;
+    milestones: string;
+    milestonesPlaceholder: string;
+    saved: string;
+    completed: string;
+  }
+>;
+
 const chapterKeys: ChapterKey[] = [
   "introduction",
   "literature",
@@ -358,7 +402,8 @@ function getStoredTheme(): Theme {
 
 function getProgress(chapters: Record<ChapterKey, ChapterStatus>) {
   const reviewedCount = chapterKeys.filter(
-    (chapter) => chapters[chapter] === "reviewed"
+    (chapter) =>
+      chapters[chapter] === "reviewed" || chapters[chapter] === "completed"
   ).length;
 
   return Math.round((reviewedCount / chapterKeys.length) * 100);
@@ -377,6 +422,8 @@ function DiplomaContent() {
     researchType: "mixed",
     researchGoal: "",
     objectives: "",
+    notes: "",
+    milestones: "",
   });
 
   const [chapters, setChapters] = useState<Record<ChapterKey, ChapterStatus>>({
@@ -387,8 +434,10 @@ function DiplomaContent() {
     discussion: "notStarted",
     conclusion: "notStarted",
   });
+  const [toast, setToast] = useState("");
 
   const t = copy[language];
+  const x = diplomaExtraCopy[language];
   const isDark = theme === "dark";
   const progress = useMemo(() => getProgress(chapters), [chapters]);
 
@@ -401,7 +450,10 @@ function DiplomaContent() {
 
     if (savedForm) {
       try {
-        setForm(JSON.parse(savedForm) as DiplomaForm);
+        setForm((current) => ({
+          ...current,
+          ...(JSON.parse(savedForm) as Partial<DiplomaForm>),
+        }));
       } catch {
         window.localStorage.removeItem(diplomaStorageKey);
       }
@@ -464,6 +516,8 @@ function DiplomaContent() {
   function saveDiplomaDraft() {
     window.localStorage.setItem(diplomaStorageKey, JSON.stringify(form));
     window.localStorage.setItem(chapterStorageKey, JSON.stringify(chapters));
+    setToast(x.saved);
+    window.setTimeout(() => setToast(""), 2600);
   }
 
   function updateChapterStatus(chapter: ChapterKey, status: ChapterStatus) {
@@ -498,6 +552,12 @@ function DiplomaContent() {
 
   return (
     <div className={pageClass}>
+      {toast && (
+        <div className="fixed right-4 top-4 z-50 max-w-sm rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20">
+          {toast}
+        </div>
+      )}
+
       <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6">
         <section
           className={`overflow-hidden rounded-[2rem] border p-5 sm:p-6 lg:p-8 ${cardClass}`}
@@ -680,6 +740,32 @@ function DiplomaContent() {
                 />
               </label>
 
+              <label className="grid gap-2">
+                <span className={`text-sm font-black ${titleClass}`}>
+                  {x.notes}
+                </span>
+                <textarea
+                  value={form.notes}
+                  onChange={(event) => updateForm("notes", event.target.value)}
+                  placeholder={x.notesPlaceholder}
+                  rows={4}
+                  className={`resize-none rounded-2xl border px-4 py-3 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+                />
+              </label>
+
+              <label className="grid gap-2">
+                <span className={`text-sm font-black ${titleClass}`}>
+                  {x.milestones}
+                </span>
+                <textarea
+                  value={form.milestones}
+                  onChange={(event) => updateForm("milestones", event.target.value)}
+                  placeholder={x.milestonesPlaceholder}
+                  rows={4}
+                  className={`resize-none rounded-2xl border px-4 py-3 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+                />
+              </label>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
@@ -787,7 +873,8 @@ function DiplomaContent() {
                           {t.chapterTitles[chapter]}
                         </p>
                         <p className={`mt-1 text-xs font-semibold ${mutedClass}`}>
-                          {t.status}: {t.statuses[chapters[chapter]]}
+                          {t.status}:{" "}
+                          {t.statuses[chapters[chapter]] ?? x.completed}
                         </p>
                       </div>
 
@@ -807,10 +894,11 @@ function DiplomaContent() {
                             "inProgress",
                             "draftReady",
                             "reviewed",
+                            "completed",
                           ] as ChapterStatus[]
                         ).map((status) => (
                           <option key={status} value={status}>
-                            {t.statuses[status]}
+                            {t.statuses[status] ?? x.completed}
                           </option>
                         ))}
                       </select>
@@ -820,7 +908,14 @@ function DiplomaContent() {
               </div>
 
               <p className={`mt-4 text-xs font-semibold ${mutedClass}`}>
-                {chapterKeys.filter((chapter) => chapters[chapter] === "reviewed").length}/
+                {
+                  chapterKeys.filter(
+                    (chapter) =>
+                      chapters[chapter] === "reviewed" ||
+                      chapters[chapter] === "completed"
+                  ).length
+                }
+                /
                 {chapterKeys.length} {t.chaptersCompleted}. {t.storedLocally}
               </p>
             </section>

@@ -1,15 +1,10 @@
-import { supabase } from "@/lib/supabase";
+import {
+  getDashboardData,
+  getDashboardPlans,
+  type DashboardPlan,
+} from "@/lib/studyApi";
 
-export type Plan = {
-  id: string;
-  display_name: string;
-  audience: string;
-  monthly_price_cents: number;
-  currency: string;
-  daily_ai_request_limit: number | null;
-  monthly_ai_request_limit: number | null;
-  is_active?: boolean;
-};
+export type Plan = DashboardPlan & { is_active?: boolean };
 
 export type Subscription = {
   id: string;
@@ -44,43 +39,55 @@ export function getCurrentMonthStart() {
   return `${year}-${month}-01`;
 }
 
+function missingSupabaseResponse() {
+  return {
+    data: null,
+    error: new Error("Dashboard API data is unavailable."),
+  };
+}
+
 export async function getPlans() {
-  return await supabase
-    .from("plans")
-    .select(
-      "id,display_name,audience,monthly_price_cents,currency,daily_ai_request_limit,monthly_ai_request_limit"
-    )
-    .order("monthly_price_cents", { ascending: true });
+  try {
+    const data = await getDashboardPlans();
+
+    return { data, error: null };
+  } catch (error) {
+    return { ...missingSupabaseResponse(), error };
+  }
 }
 
 export async function getCurrentSubscription() {
-  return await supabase
-    .from("subscriptions")
-    .select(
-      "id,status,started_at,expires_at,plans(id,display_name,monthly_price_cents,currency,daily_ai_request_limit,monthly_ai_request_limit)"
-    )
-    .in("status", ["active", "trialing"])
-    .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  try {
+    const data = await getDashboardData();
+
+    return {
+      data: {
+        ...data.subscription,
+        plans: data.subscription.plan,
+      },
+      error: null,
+    };
+  } catch (error) {
+    return { ...missingSupabaseResponse(), error };
+  }
 }
 
 export async function getCurrentMonthUsage() {
-  const currentMonthStart = getCurrentMonthStart();
+  try {
+    const data = await getDashboardData();
 
-  return await supabase
-    .from("monthly_usage")
-    .select("ai_requests_used,documents_generated,period_start")
-    .eq("period_start", currentMonthStart)
-    .maybeSingle();
+    return { data: data.usage, error: null };
+  } catch (error) {
+    return { ...missingSupabaseResponse(), error };
+  }
 }
 
 export async function getRecentActivity() {
-  return await supabase
-    .from("activity_events")
-    .select(
-      "id,event_type,title,description,status,resource_type,resource_id,created_at"
-    )
-    .order("created_at", { ascending: false })
-    .limit(5);
+  try {
+    const data = await getDashboardData();
+
+    return { data: data.recent_activity, error: null };
+  } catch (error) {
+    return { ...missingSupabaseResponse(), error };
+  }
 }

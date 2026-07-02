@@ -23,6 +23,12 @@ export default function AiTutorChatPage() {
 
   useEffect(() => {
     async function loadMessages() {
+      if (!supabase) {
+        setError("Supabase client is not configured. Chat history is unavailable.");
+        setLoading(false);
+        return;
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
 
       if (!sessionData.session) {

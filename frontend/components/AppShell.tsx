@@ -1,8 +1,8 @@
 "use client";
 
-import AuthGuard from "@/components/AuthGuard";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { readLocalProfile, type LocalProfile } from "@/lib/profile";
 import {
   ReactNode,
   useEffect,
@@ -14,16 +14,16 @@ import {
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
 
-type LocalProfile = {
-  displayName?: string;
-  university?: string;
-  program?: string;
-  updatedAt?: string;
-};
-
 type Copy = {
   search: string;
   searchShortcut: string;
+  searchEmpty: string;
+  actions: {
+    goTo: string;
+    createAssignment: string;
+    uploadFile: string;
+    createDocument: string;
+  };
   student: string;
   studentPlan: string;
   unlockTitle: string;
@@ -46,6 +46,13 @@ const copy: Record<Language, Copy> = {
   en: {
     search: "Search...",
     searchShortcut: "⌘K",
+    searchEmpty: "No command found",
+    actions: {
+      goTo: "Go to",
+      createAssignment: "Create Assignment",
+      uploadFile: "Upload File",
+      createDocument: "Create Document",
+    },
     student: "Student",
     studentPlan: "Student plan",
     unlockTitle: "Unlock your potential",
@@ -66,6 +73,13 @@ const copy: Record<Language, Copy> = {
   ru: {
     search: "Поиск...",
     searchShortcut: "⌘K",
+    searchEmpty: "Команда не найдена",
+    actions: {
+      goTo: "Перейти",
+      createAssignment: "Создать задание",
+      uploadFile: "Загрузить файл",
+      createDocument: "Создать документ",
+    },
     student: "Студент",
     studentPlan: "Студенческий план",
     unlockTitle: "Раскрой свой потенциал",
@@ -87,6 +101,13 @@ const copy: Record<Language, Copy> = {
   kz: {
     search: "Іздеу...",
     searchShortcut: "⌘K",
+    searchEmpty: "Команда табылмады",
+    actions: {
+      goTo: "Өту",
+      createAssignment: "Тапсырма құру",
+      uploadFile: "Файл жүктеу",
+      createDocument: "Құжат құру",
+    },
     student: "Студент",
     studentPlan: "Студент жоспары",
     unlockTitle: "Мүмкіндігіңізді ашыңыз",
@@ -121,8 +142,6 @@ const languageStorageKeys = [
 ];
 
 const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
-const profileStorageKey = "studyai-settings-profile";
-
 const navItems = [
   { key: "dashboard", href: "/dashboard", icon: "▣" },
   { key: "aiTutor", href: "/ai-tutor", icon: "🤖" },
@@ -182,20 +201,6 @@ function applyTheme(theme: Theme) {
   }
 }
 
-function readLocalProfile(): LocalProfile {
-  if (typeof window === "undefined") return {};
-
-  const rawProfile = window.localStorage.getItem(profileStorageKey);
-
-  if (!rawProfile) return {};
-
-  try {
-    return JSON.parse(rawProfile) as LocalProfile;
-  } catch {
-    return {};
-  }
-}
-
 function getInitials(name: string) {
   const cleaned = name.trim();
 
@@ -218,13 +223,17 @@ function isActivePath(pathname: string, href: string) {
 }
 
 export default function AppShell({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
+  const commandMenuRef = useRef<HTMLDivElement | null>(null);
 
   const [language, setLanguage] = useState<Language>("ru");
   const [theme, setTheme] = useState<Theme>("dark");
   const [profile, setProfile] = useState<LocalProfile>({});
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const [commandMenuOpen, setCommandMenuOpen] = useState(false);
+  const [commandSearch, setCommandSearch] = useState("");
 
   const t = copy[language];
 
@@ -234,6 +243,50 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   const currentPageTitle =
     navItems.find((item) => isActivePath(pathname, item.href))?.key || null;
+
+  const commands = useMemo(() => {
+    const pageCommands = navItems.map((item) => ({
+      id: item.href,
+      label: `${t.actions.goTo} ${t.nav[item.key]}`,
+      href: item.href,
+      icon: item.icon,
+      keywords: `${item.key} ${t.nav[item.key]} ${item.href}`,
+    }));
+
+    return [
+      ...pageCommands,
+      {
+        id: "create-assignment",
+        label: t.actions.createAssignment,
+        href: "/assignments",
+        icon: "☑",
+        keywords: "assignment task create new",
+      },
+      {
+        id: "upload-file",
+        label: t.actions.uploadFile,
+        href: "/files",
+        icon: "📁",
+        keywords: "file upload materials",
+      },
+      {
+        id: "create-document",
+        label: t.actions.createDocument,
+        href: "/documents",
+        icon: "📄",
+        keywords: "document draft essay report",
+      },
+    ];
+  }, [t]);
+
+  const filteredCommands = useMemo(() => {
+    const query = commandSearch.trim().toLowerCase();
+    if (!query) return commands;
+
+    return commands.filter((command) =>
+      [command.label, command.keywords].join(" ").toLowerCase().includes(query)
+    );
+  }, [commandSearch, commands]);
 
   useEffect(() => {
     const storedLanguage = getStoredValue<Language>(
@@ -267,6 +320,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
         !languageMenuRef.current.contains(event.target as Node)
       ) {
         setLanguageMenuOpen(false);
+      }
+
+      if (
+        commandMenuRef.current &&
+        !commandMenuRef.current.contains(event.target as Node)
+      ) {
+        setCommandMenuOpen(false);
       }
     }
 
@@ -366,6 +426,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
         detail: nextTheme,
       })
     );
+  }
+
+  function runCommand(href: string) {
+    setCommandMenuOpen(false);
+    setCommandSearch("");
+    router.push(href);
   }
 
   const shellClass = isDark
@@ -499,9 +565,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
               </span>
             </Link>
 
-            <div className="hidden min-w-0 flex-1 justify-center 2xl:flex">
-              <button
-                type="button"
+            <div
+              ref={commandMenuRef}
+              className="relative hidden min-w-0 flex-1 justify-center 2xl:flex"
+            >
+              <div
                 className={`flex h-11 w-full max-w-[560px] items-center gap-3 rounded-2xl border px-4 text-left text-sm transition ${controlClass}`}
               >
                 <svg
@@ -515,9 +583,26 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   <path d="m21 21-4.35-4.35" />
                 </svg>
 
-                <span className="min-w-0 flex-1 truncate opacity-75">
-                  {t.search}
-                </span>
+                <input
+                  value={commandSearch}
+                  onChange={(event) => {
+                    setCommandSearch(event.target.value);
+                    setCommandMenuOpen(true);
+                  }}
+                  onFocus={() => setCommandMenuOpen(true)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && filteredCommands[0]) {
+                      event.preventDefault();
+                      runCommand(filteredCommands[0].href);
+                    }
+
+                    if (event.key === "Escape") {
+                      setCommandMenuOpen(false);
+                    }
+                  }}
+                  placeholder={t.search}
+                  className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:opacity-75"
+                />
 
                 <span
                   className={`shrink-0 rounded-xl border px-2.5 py-1 text-xs font-black ${
@@ -528,7 +613,47 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 >
                   {t.searchShortcut}
                 </span>
-              </button>
+              </div>
+
+              {commandMenuOpen && (
+                <div
+                  className={`absolute top-13 z-50 w-full max-w-[560px] overflow-hidden rounded-2xl border p-2 shadow-xl ${
+                    isDark
+                      ? "border-white/10 bg-slate-900 shadow-black/30"
+                      : "border-slate-200 bg-white shadow-slate-900/10"
+                  }`}
+                >
+                  {filteredCommands.length > 0 ? (
+                    filteredCommands.slice(0, 8).map((command) => (
+                      <button
+                        key={command.id}
+                        type="button"
+                        onClick={() => runCommand(command.href)}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold transition ${
+                          isDark
+                            ? "text-slate-200 hover:bg-white/10"
+                            : "text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-xs text-white">
+                          {command.icon}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {command.label}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <p
+                      className={`px-3 py-3 text-sm font-bold ${
+                        isDark ? "text-slate-400" : "text-slate-500"
+                      }`}
+                    >
+                      {t.searchEmpty}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">

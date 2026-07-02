@@ -6,11 +6,14 @@ import AppShell from "@/components/AppShell";
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
 type PrepMode = "studyPlan" | "flashcards" | "practiceQuiz" | "weakTopics";
+type Difficulty = "easy" | "medium" | "hard";
 
 type ExamForm = {
   examTitle: string;
   subject: string;
   examDate: string;
+  difficulty: Difficulty;
+  dailyTime: string;
   prepMode: PrepMode;
   topics: string;
   currentKnowledge: string;
@@ -21,6 +24,11 @@ type SavedExam = {
   title: string;
   subject: string;
   date: string;
+  difficulty?: Difficulty;
+  dailyTime?: string;
+  topics?: string;
+  currentKnowledge?: string;
+  prepMode?: PrepMode;
   progress: number;
 };
 
@@ -431,6 +439,62 @@ const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 const examFormStorageKey = "studyai-exam-prep-form";
 const savedExamStorageKey = "studyai-exam-prep-saved";
 
+const emptyExamForm: ExamForm = {
+  examTitle: "",
+  subject: "",
+  examDate: "",
+  difficulty: "medium",
+  dailyTime: "",
+  prepMode: "studyPlan",
+  topics: "",
+  currentKnowledge: "",
+};
+
+const actionCopy = {
+  en: {
+    difficulty: "Difficulty",
+    dailyTime: "Daily time",
+    dailyTimePlaceholder: "e.g. 45 minutes",
+    edit: "Edit",
+    delete: "Delete",
+    saved: "Saved locally because backend is unavailable.",
+    deleted: "Exam plan deleted.",
+    difficultyOptions: { easy: "Easy", medium: "Medium", hard: "Hard" },
+  },
+  ru: {
+    difficulty: "Сложность",
+    dailyTime: "Время в день",
+    dailyTimePlaceholder: "например: 45 минут",
+    edit: "Изменить",
+    delete: "Удалить",
+    saved: "Сохранено локально, потому что backend недоступен.",
+    deleted: "План экзамена удален.",
+    difficultyOptions: { easy: "Легко", medium: "Средне", hard: "Сложно" },
+  },
+  kz: {
+    difficulty: "Қиындық",
+    dailyTime: "Күндік уақыт",
+    dailyTimePlaceholder: "мысалы: 45 минут",
+    edit: "Өңдеу",
+    delete: "Жою",
+    saved: "Backend қолжетімсіз болғандықтан жергілікті түрде сақталды.",
+    deleted: "Емтихан жоспары жойылды.",
+    difficultyOptions: { easy: "Оңай", medium: "Орташа", hard: "Қиын" },
+  },
+} satisfies Record<
+  Language,
+  {
+    difficulty: string;
+    dailyTime: string;
+    dailyTimePlaceholder: string;
+    edit: string;
+    delete: string;
+    saved: string;
+    deleted: string;
+    difficultyOptions: Record<Difficulty, string>;
+  }
+>;
+
 function getStoredLanguage(): Language {
   if (typeof window === "undefined") return "ru";
 
@@ -463,19 +527,15 @@ function ExamPrepContent() {
   const [language, setLanguage] = useState<Language>("ru");
   const [theme, setTheme] = useState<Theme>("dark");
 
-  const [form, setForm] = useState<ExamForm>({
-    examTitle: "",
-    subject: "",
-    examDate: "",
-    prepMode: "studyPlan",
-    topics: "",
-    currentKnowledge: "",
-  });
+  const [form, setForm] = useState<ExamForm>(emptyExamForm);
 
   const [savedExams, setSavedExams] = useState<SavedExam[]>([]);
+  const [editingExamId, setEditingExamId] = useState<number | null>(null);
   const [showPreview, setShowPreview] = useState(true);
+  const [toast, setToast] = useState("");
 
   const t = copy[language];
+  const a = actionCopy[language];
   const isDark = theme === "dark";
 
   useEffect(() => {
@@ -487,7 +547,7 @@ function ExamPrepContent() {
 
     if (savedForm) {
       try {
-        setForm(JSON.parse(savedForm) as ExamForm);
+        setForm({ ...emptyExamForm, ...(JSON.parse(savedForm) as Partial<ExamForm>) });
       } catch {
         window.localStorage.removeItem(examFormStorageKey);
       }
@@ -549,6 +609,11 @@ function ExamPrepContent() {
     }));
   }
 
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 2600);
+  }
+
   function generatePreview() {
     window.localStorage.setItem(examFormStorageKey, JSON.stringify(form));
     setShowPreview(true);
@@ -556,32 +621,60 @@ function ExamPrepContent() {
 
   function saveExam() {
     const newExam: SavedExam = {
-      id: Date.now(),
+      id: editingExamId ?? Date.now(),
       title: form.examTitle.trim() || t.examTitlePlaceholder,
       subject: form.subject.trim() || t.subjectPlaceholder,
       date: form.examDate.trim() || t.datePlaceholder,
+      difficulty: form.difficulty,
+      dailyTime: form.dailyTime,
+      topics: form.topics,
+      currentKnowledge: form.currentKnowledge,
+      prepMode: form.prepMode,
       progress: 17,
     };
 
-    const nextSavedExams = [newExam, ...savedExams];
+    const nextSavedExams = editingExamId
+      ? savedExams.map((exam) => (exam.id === editingExamId ? newExam : exam))
+      : [newExam, ...savedExams];
 
     setSavedExams(nextSavedExams);
     window.localStorage.setItem(savedExamStorageKey, JSON.stringify(nextSavedExams));
     window.localStorage.setItem(examFormStorageKey, JSON.stringify(form));
+    setEditingExamId(newExam.id);
+    showToast(a.saved);
   }
 
   function clearForm() {
-    const emptyForm: ExamForm = {
-      examTitle: "",
-      subject: "",
-      examDate: "",
-      prepMode: "studyPlan",
-      topics: "",
-      currentKnowledge: "",
-    };
+    setEditingExamId(null);
+    setForm(emptyExamForm);
+    window.localStorage.setItem(examFormStorageKey, JSON.stringify(emptyExamForm));
+  }
 
-    setForm(emptyForm);
-    window.localStorage.setItem(examFormStorageKey, JSON.stringify(emptyForm));
+  function editExam(exam: SavedExam) {
+    setEditingExamId(exam.id);
+    setForm({
+      examTitle: exam.title,
+      subject: exam.subject,
+      examDate: exam.date,
+      difficulty: exam.difficulty ?? "medium",
+      dailyTime: exam.dailyTime ?? "",
+      prepMode: exam.prepMode ?? "studyPlan",
+      topics: exam.topics ?? "",
+      currentKnowledge: exam.currentKnowledge ?? "",
+    });
+    setShowPreview(true);
+  }
+
+  function deleteExam(id: number) {
+    const nextSavedExams = savedExams.filter((exam) => exam.id !== id);
+
+    setSavedExams(nextSavedExams);
+    window.localStorage.setItem(savedExamStorageKey, JSON.stringify(nextSavedExams));
+    if (editingExamId === id) {
+      setEditingExamId(null);
+      setForm(emptyExamForm);
+    }
+    showToast(a.deleted);
   }
 
   const pageClass = isDark
@@ -610,6 +703,12 @@ function ExamPrepContent() {
 
   return (
     <div className={pageClass}>
+      {toast && (
+        <div className="fixed right-4 top-4 z-50 max-w-sm rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-600/20">
+          {toast}
+        </div>
+      )}
+
       <div className="mx-auto grid w-full max-w-7xl min-w-0 gap-6">
         <section
           className={`overflow-hidden rounded-[2rem] border p-5 sm:p-6 lg:p-8 ${cardClass}`}
@@ -697,6 +796,39 @@ function ExamPrepContent() {
                     value={form.examDate}
                     onChange={(event) => updateForm("examDate", event.target.value)}
                     placeholder={t.datePlaceholder}
+                    className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className={`text-sm font-black ${titleClass}`}>
+                    {a.difficulty}
+                  </span>
+                  <select
+                    value={form.difficulty}
+                    onChange={(event) =>
+                      updateForm("difficulty", event.target.value as Difficulty)
+                    }
+                    className={`h-12 rounded-2xl border px-4 text-sm font-semibold outline-none transition focus:ring-4 ${inputClass}`}
+                  >
+                    {(["easy", "medium", "hard"] as Difficulty[]).map((difficulty) => (
+                      <option key={difficulty} value={difficulty}>
+                        {a.difficultyOptions[difficulty]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="grid gap-2">
+                  <span className={`text-sm font-black ${titleClass}`}>
+                    {a.dailyTime}
+                  </span>
+                  <input
+                    value={form.dailyTime}
+                    onChange={(event) => updateForm("dailyTime", event.target.value)}
+                    placeholder={a.dailyTimePlaceholder}
                     className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
                   />
                 </label>
@@ -955,25 +1087,27 @@ function ExamPrepContent() {
                     <div className="flex gap-2">
                       <button
                         type="button"
+                        onClick={() => editExam(exam)}
                         className={`h-10 rounded-2xl border px-4 text-sm font-black transition ${
                           isDark
                             ? "border-white/10 bg-slate-950/60 text-slate-100 hover:bg-white/10"
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                         }`}
                       >
-                        {t.open}
+                        {a.edit}
                       </button>
 
                       <button
                         type="button"
-                        className="h-10 rounded-2xl bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700"
+                        onClick={() => deleteExam(exam.id)}
+                        className="h-10 rounded-2xl bg-rose-600 px-4 text-sm font-black text-white transition hover:bg-rose-700"
                       >
-                        {t.continue}
+                        {a.delete}
                       </button>
                     </div>
                   </div>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-5 grid gap-3 sm:grid-cols-4">
                     <div className={`rounded-2xl border p-4 ${cardClass}`}>
                       <p
                         className={`text-xs font-bold uppercase tracking-wide ${mutedClass}`}
@@ -982,6 +1116,28 @@ function ExamPrepContent() {
                       </p>
                       <p className={`mt-1 text-sm font-black ${titleClass}`}>
                         {exam.date}
+                      </p>
+                    </div>
+
+                    <div className={`rounded-2xl border p-4 ${cardClass}`}>
+                      <p
+                        className={`text-xs font-bold uppercase tracking-wide ${mutedClass}`}
+                      >
+                        {a.difficulty}
+                      </p>
+                      <p className={`mt-1 text-sm font-black ${titleClass}`}>
+                        {a.difficultyOptions[exam.difficulty ?? "medium"]}
+                      </p>
+                    </div>
+
+                    <div className={`rounded-2xl border p-4 ${cardClass}`}>
+                      <p
+                        className={`text-xs font-bold uppercase tracking-wide ${mutedClass}`}
+                      >
+                        {a.dailyTime}
+                      </p>
+                      <p className={`mt-1 text-sm font-black ${titleClass}`}>
+                        {exam.dailyTime || a.dailyTimePlaceholder}
                       </p>
                     </div>
 

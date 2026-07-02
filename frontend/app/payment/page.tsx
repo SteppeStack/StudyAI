@@ -2,10 +2,14 @@
 
 import AppShell from "@/components/AppShell";
 import { type Language } from "@/lib/i18n";
+import {
+  STUDYAI_PRICING,
+  type PaidPricingPlanKey,
+} from "@/lib/pricing";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-type PlanKey = "pro" | "premium";
+type PlanKey = PaidPricingPlanKey;
 type BillingCycle = "monthly" | "yearly";
 type PaymentMethod = "card" | "paypal" | "bank";
 
@@ -19,7 +23,7 @@ const paymentText = {
       "Review your plan, choose a payment method, and confirm your subscription. This is currently an interface preview.",
     checkout: "Checkout",
     checkoutHint:
-      "Payment provider integration will be connected later through backend/API.",
+      "Payments are currently preview-only. Payment provider integration will be connected later through backend/API.",
     selectedPlan: "Selected plan",
     billingCycle: "Billing cycle",
     paymentMethod: "Payment method",
@@ -51,7 +55,7 @@ const paymentText = {
     previewNotice: "Interface preview",
     monthly: "Monthly",
     yearly: "Yearly",
-    save: "Yearly plan saves 20%",
+    save: "Yearly price",
     planLabels: {
       pro: "Pro",
       premium: "Premium",
@@ -84,7 +88,7 @@ const paymentText = {
       "Проверь выбранный план, выбери способ оплаты и подтверди подписку. Сейчас это предпросмотр интерфейса.",
     checkout: "Оплата",
     checkoutHint:
-      "Интеграция платёжного провайдера будет подключена позже через backend/API.",
+      "Платежи пока работают в preview-режиме. Интеграция платёжного провайдера будет подключена позже через сервер/API.",
     selectedPlan: "Выбранный план",
     billingCycle: "Период оплаты",
     paymentMethod: "Способ оплаты",
@@ -116,7 +120,7 @@ const paymentText = {
     previewNotice: "Предпросмотр интерфейса",
     monthly: "Ежемесячно",
     yearly: "Ежегодно",
-    save: "Годовой план экономит 20%",
+    save: "Годовая цена",
     planLabels: {
       pro: "Pro",
       premium: "Premium",
@@ -146,10 +150,10 @@ const paymentText = {
     badge: "Қауіпсіз төлем",
     mainTitle: "StudyAI жоспарын жақсартуды аяқта",
     mainText:
-      "Таңдалған жоспарды тексер, төлем әдісін таңда және жазылымды раста. Қазір бұл интерфейс preview.",
+      "Таңдалған жоспарды тексер, төлем әдісін таңда және жазылымды раста. Қазір бұл интерфейс preview режимінде.",
     checkout: "Төлем",
     checkoutHint:
-      "Төлем провайдері кейін backend/API арқылы қосылады.",
+      "Төлемдер әзірге preview режимінде жұмыс істейді. Төлем провайдері кейін сервер/API арқылы қосылады.",
     selectedPlan: "Таңдалған жоспар",
     billingCycle: "Төлем кезеңі",
     paymentMethod: "Төлем әдісі",
@@ -178,10 +182,10 @@ const paymentText = {
       "Нақты төлем жасалған жоқ. Кейін бұл әрекет төлем провайдері арқылы нақты жазылым жасайды.",
     backToSubscription: "Жазылымға оралу",
     secureNote: "Төлем қауіпсіз өңделеді.",
-    previewNotice: "Интерфейс preview",
+    previewNotice: "Интерфейс preview режимінде",
     monthly: "Ай сайын",
     yearly: "Жыл сайын",
-    save: "Жылдық жоспар 20% үнемдейді",
+    save: "Жылдық баға",
     planLabels: {
       pro: "Pro",
       premium: "Premium",
@@ -207,22 +211,57 @@ const paymentText = {
 };
 
 const planPrices = {
-  pro: {
-    monthly: 7.99,
-    yearly: 76.99,
-  },
-  premium: {
-    monthly: 14.99,
-    yearly: 143.99,
-  },
+  pro: STUDYAI_PRICING.pro,
+  premium: STUDYAI_PRICING.premium,
 };
 
+const planPreviewStorageKey = "studyai-subscription-preview";
+const languageStorageKeys = [
+  "studyai-language",
+  "studyai_lang",
+  "language",
+  "locale",
+];
+
+function getStoredLanguage(): Language {
+  for (const key of languageStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value === "en" || value === "ru" || value === "kz") return value;
+  }
+
+  return "en";
+}
+
 function formatPrice(value: number) {
-  return `€${value.toFixed(2)}`;
+  return value === 0 ? "$0" : `$${value.toFixed(2)}`;
+}
+
+function formatBillingPrice(
+  value: number,
+  billingCycle: BillingCycle,
+  language: Language
+) {
+  const suffixes: Record<Language, Record<BillingCycle, string>> = {
+    en: {
+      monthly: "/month",
+      yearly: "/year",
+    },
+    ru: {
+      monthly: "/мес",
+      yearly: "/год",
+    },
+    kz: {
+      monthly: "/ай",
+      yearly: "/жыл",
+    },
+  };
+
+  return `${formatPrice(value)}${suffixes[language][billingCycle]}`;
 }
 
 export default function PaymentPage() {
-  const [language] = useState<Language>("en");
+  const [language, setLanguage] = useState<Language>("en");
   const [plan, setPlan] = useState<PlanKey>("pro");
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
@@ -238,9 +277,29 @@ export default function PaymentPage() {
   const t = useMemo(() => paymentText[language], [language]);
 
   const subtotal = planPrices[plan][billingCycle];
-  const discount = billingCycle === "yearly" ? subtotal * 0.2 : 0;
+  const discount = 0;
   const taxes = 0;
   const total = subtotal - discount + taxes;
+
+  useEffect(() => {
+    setLanguage(getStoredLanguage());
+
+    const params = new URLSearchParams(window.location.search);
+    const queryPlan = params.get("plan");
+    const queryBilling = params.get("billing");
+    const savedPlan = window.localStorage.getItem(planPreviewStorageKey);
+
+    if (queryPlan === "pro" || queryPlan === "premium") {
+      setPlan(queryPlan);
+      window.localStorage.setItem(planPreviewStorageKey, queryPlan);
+    } else if (savedPlan === "pro" || savedPlan === "premium") {
+      setPlan(savedPlan);
+    }
+
+    if (queryBilling === "monthly" || queryBilling === "yearly") {
+      setBillingCycle(queryBilling);
+    }
+  }, []);
 
   function handlePayment() {
     setProcessing(true);
@@ -326,7 +385,13 @@ export default function PaymentPage() {
                         <button
                           key={item}
                           type="button"
-                          onClick={() => setPlan(item)}
+                          onClick={() => {
+                            setPlan(item);
+                            window.localStorage.setItem(
+                              planPreviewStorageKey,
+                              item
+                            );
+                          }}
                           className={`rounded-3xl border p-4 text-left transition ${
                             plan === item
                               ? "border-blue-300 bg-blue-50 shadow-sm"
@@ -531,16 +596,18 @@ export default function PaymentPage() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">{t.subtotal}</span>
                     <span className="font-bold text-slate-950">
-                      {formatPrice(subtotal)}
+                      {formatBillingPrice(subtotal, billingCycle, language)}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">{t.discount}</span>
-                    <span className="font-bold text-emerald-600">
-                      -{formatPrice(discount)}
-                    </span>
-                  </div>
+                  {discount > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">{t.discount}</span>
+                      <span className="font-bold text-emerald-600">
+                        -{formatPrice(discount)}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">{t.taxes}</span>
@@ -555,7 +622,7 @@ export default function PaymentPage() {
                         {t.total}
                       </span>
                       <span className="text-3xl font-black text-slate-950">
-                        {formatPrice(total)}
+                        {formatBillingPrice(total, billingCycle, language)}
                       </span>
                     </div>
                   </div>

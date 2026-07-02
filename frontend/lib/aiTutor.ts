@@ -18,7 +18,18 @@ export type Message = {
   created_at: string;
 };
 
+function missingSupabaseResponse() {
+  return {
+    data: null,
+    error: new Error(
+      "Supabase client is not configured. AI Tutor history is unavailable."
+    ),
+  };
+}
+
 export async function getConversations() {
+  if (!supabase) return missingSupabaseResponse();
+
   return await supabase
     .from("ai_conversations")
     .select("*")
@@ -26,6 +37,8 @@ export async function getConversations() {
 }
 
 export async function createConversation(userId: string, title: string) {
+  if (!supabase) return missingSupabaseResponse();
+
   return await supabase
     .from("ai_conversations")
     .insert({
@@ -37,6 +50,8 @@ export async function createConversation(userId: string, title: string) {
 }
 
 export async function getMessages(conversationId: string) {
+  if (!supabase) return missingSupabaseResponse();
+
   return await supabase
     .from("ai_messages")
     .select("*")

@@ -9,9 +9,36 @@ type AuthGuardProps = {
 };
 
 const publicRoutes = ["/", "/login", "/register"];
+const protectedRoutes = [
+  "/dashboard",
+  "/files",
+  "/settings",
+  "/assignments",
+  "/documents",
+  "/exam-prep",
+  "/diploma",
+  "/subscription",
+  "/payment",
+  "/ai-tutor",
+];
+const authMarkerCookie = "studyai-authenticated";
 
 function isPublicRoute(pathname: string) {
   return publicRoutes.includes(pathname);
+}
+
+function isProtectedRoute(pathname: string) {
+  return protectedRoutes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
+
+function setAuthMarkerCookie(loggedIn: boolean) {
+  if (typeof document === "undefined") return;
+
+  document.cookie = loggedIn
+    ? `${authMarkerCookie}=1; Path=/; SameSite=Lax; Max-Age=2592000`
+    : `${authMarkerCookie}=; Path=/; SameSite=Lax; Max-Age=0`;
 }
 
 export default function AuthGuard({ children }: AuthGuardProps) {
@@ -20,19 +47,36 @@ export default function AuthGuard({ children }: AuthGuardProps) {
 
   const [isChecking, setIsChecking] = useState(true);
   const [isAllowed, setIsAllowed] = useState(false);
+  const [checkedPathname, setCheckedPathname] = useState("");
 
   useEffect(() => {
     let active = true;
 
     async function checkAuth() {
+      setIsChecking(true);
+      setIsAllowed(false);
+      setCheckedPathname("");
+
+      const publicPage = isPublicRoute(pathname);
+      const protectedPage = isProtectedRoute(pathname);
+
       if (!supabase) {
-        if (isPublicRoute(pathname)) {
+        if (publicPage || !protectedPage) {
+          if (!active) return;
+
+          setAuthMarkerCookie(false);
           setIsAllowed(true);
+          setCheckedPathname(pathname);
           setIsChecking(false);
           return;
         }
 
+        if (!active) return;
+
+        setAuthMarkerCookie(false);
+        setCheckedPathname(pathname);
         router.replace("/login");
+        setIsChecking(false);
         return;
       }
 
@@ -43,19 +87,24 @@ export default function AuthGuard({ children }: AuthGuardProps) {
       if (!active) return;
 
       const loggedIn = Boolean(session?.user);
-      const publicPage = isPublicRoute(pathname);
+      setAuthMarkerCookie(loggedIn);
 
-      if (!loggedIn && !publicPage) {
+      if (!loggedIn && protectedPage) {
+        setCheckedPathname(pathname);
         router.replace("/login");
+        setIsChecking(false);
         return;
       }
 
       if (loggedIn && (pathname === "/login" || pathname === "/register")) {
+        setCheckedPathname(pathname);
         router.replace("/dashboard");
+        setIsChecking(false);
         return;
       }
 
       setIsAllowed(true);
+      setCheckedPathname(pathname);
       setIsChecking(false);
     }
 
@@ -64,19 +113,26 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     const { data } =
       supabase?.auth.onAuthStateChange((_event, session) => {
         const loggedIn = Boolean(session?.user);
-        const publicPage = isPublicRoute(pathname);
+        const protectedPage = isProtectedRoute(pathname);
 
-        if (!loggedIn && !publicPage) {
+        setAuthMarkerCookie(loggedIn);
+
+        if (!loggedIn && protectedPage) {
+          setIsAllowed(false);
+          setCheckedPathname(pathname);
           router.replace("/login");
           return;
         }
 
         if (loggedIn && (pathname === "/login" || pathname === "/register")) {
+          setIsAllowed(false);
+          setCheckedPathname(pathname);
           router.replace("/dashboard");
           return;
         }
 
         setIsAllowed(true);
+        setCheckedPathname(pathname);
         setIsChecking(false);
       }) ?? { data: { subscription: null } };
 
@@ -86,7 +142,9 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     };
   }, [pathname, router]);
 
-  if (isChecking) {
+  const routeWasChecked = checkedPathname === pathname;
+
+  if (isChecking || !routeWasChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
         <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-center shadow-2xl">
@@ -101,7 +159,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  if (!isAllowed) {
+  if (!isAllowed || !routeWasChecked) {
     return null;
   }
 

@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  readLocalProfile,
+  saveLocalProfile,
+} from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
 
 type Language = "en" | "ru" | "kz";
@@ -196,8 +200,6 @@ const languageStorageKeys = [
 ];
 
 const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
-const profileStorageKey = "studyai-settings-profile";
-
 function getStoredValue<T extends string>(
   keys: string[],
   allowedValues: readonly T[],
@@ -289,27 +291,13 @@ export default function SettingsPage() {
     saveValueToStorage(themeStorageKeys, storedTheme);
     applyTheme(storedTheme);
 
-    const rawProfile = window.localStorage.getItem(profileStorageKey);
+    const profile = readLocalProfile();
+    setDisplayName(profile.displayName || "");
+    setUniversity(profile.university || "");
+    setProgram(profile.program || "");
 
-    if (rawProfile) {
-      try {
-        const profile = JSON.parse(rawProfile) as {
-          displayName?: string;
-          university?: string;
-          program?: string;
-          updatedAt?: string;
-        };
-
-        setDisplayName(profile.displayName || "");
-        setUniversity(profile.university || "");
-        setProgram(profile.program || "");
-
-        if (profile.updatedAt) {
-          setLastUpdated(new Date(profile.updatedAt));
-        }
-      } catch {
-        window.localStorage.removeItem(profileStorageKey);
-      }
+    if (profile.updatedAt) {
+      setLastUpdated(new Date(profile.updatedAt));
     }
 
     function handleThemeChange(event: Event) {
@@ -382,21 +370,16 @@ export default function SettingsPage() {
 
     const updatedAt = new Date();
 
-    window.localStorage.setItem(
-      profileStorageKey,
-      JSON.stringify({
-        displayName,
-        university,
-        program,
-        updatedAt: updatedAt.toISOString(),
-      })
-    );
+    saveLocalProfile({
+      displayName,
+      university,
+      program,
+      updatedAt: updatedAt.toISOString(),
+    });
 
     saveValueToStorage(languageStorageKeys, language);
     saveValueToStorage(themeStorageKeys, theme);
     applyTheme(theme);
-
-    window.dispatchEvent(new CustomEvent("studyai:profile-change"));
 
     window.setTimeout(() => {
       setLastUpdated(updatedAt);

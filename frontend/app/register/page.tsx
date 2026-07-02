@@ -7,6 +7,7 @@ import AuthShell, {
   type AuthLanguage,
   type AuthTheme,
 } from "@/components/AuthShell";
+import { saveDisplayName } from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
 
 type RegisterCopy = {
@@ -27,6 +28,10 @@ type RegisterCopy = {
     badge: string;
     title: string;
     subtitle: string;
+    firstName: string;
+    firstNamePlaceholder: string;
+    lastName: string;
+    lastNamePlaceholder: string;
     email: string;
     emailPlaceholder: string;
     password: string;
@@ -38,6 +43,8 @@ type RegisterCopy = {
     hasAccount: string;
     login: string;
     passwordMismatch: string;
+    firstNameRequired: string;
+    lastNameRequired: string;
     successTitle: string;
     successText: string;
     errorFallback: string;
@@ -65,6 +72,10 @@ const copy: Record<AuthLanguage, RegisterCopy> = {
       badge: "Create account",
       title: "Join StudyAI",
       subtitle: "Create your account and start organizing your study workflow.",
+      firstName: "First name",
+      firstNamePlaceholder: "First name",
+      lastName: "Last name",
+      lastNamePlaceholder: "Last name",
       email: "Email",
       emailPlaceholder: "you@example.com",
       password: "Password",
@@ -76,6 +87,8 @@ const copy: Record<AuthLanguage, RegisterCopy> = {
       hasAccount: "Already have an account?",
       login: "Log in",
       passwordMismatch: "Passwords do not match.",
+      firstNameRequired: "First name is required.",
+      lastNameRequired: "Last name is required.",
       successTitle: "Check your email",
       successText:
         "Your account was created. Confirm your email if Supabase email confirmation is enabled.",
@@ -103,6 +116,10 @@ const copy: Record<AuthLanguage, RegisterCopy> = {
       title: "Присоединиться к StudyAI",
       subtitle:
         "Создай аккаунт и начни организовывать свой учебный процесс.",
+      firstName: "Имя",
+      firstNamePlaceholder: "Имя",
+      lastName: "Фамилия",
+      lastNamePlaceholder: "Фамилия",
       email: "Email",
       emailPlaceholder: "you@example.com",
       password: "Пароль",
@@ -114,6 +131,8 @@ const copy: Record<AuthLanguage, RegisterCopy> = {
       hasAccount: "Уже есть аккаунт?",
       login: "Войти",
       passwordMismatch: "Пароли не совпадают.",
+      firstNameRequired: "Введите имя.",
+      lastNameRequired: "Введите фамилию.",
       successTitle: "Проверь email",
       successText:
         "Аккаунт создан. Подтверди email, если в Supabase включено подтверждение почты.",
@@ -140,6 +159,10 @@ const copy: Record<AuthLanguage, RegisterCopy> = {
       badge: "Аккаунт жасау",
       title: "StudyAI-ға қосылу",
       subtitle: "Аккаунт жасап, оқу процесіңізді ұйымдастыруды бастаңыз.",
+      firstName: "Аты",
+      firstNamePlaceholder: "Аты",
+      lastName: "Тегі",
+      lastNamePlaceholder: "Тегі",
       email: "Email",
       emailPlaceholder: "you@example.com",
       password: "Құпиясөз",
@@ -151,6 +174,8 @@ const copy: Record<AuthLanguage, RegisterCopy> = {
       hasAccount: "Аккаунтыңыз бар ма?",
       login: "Кіру",
       passwordMismatch: "Құпиясөздер сәйкес емес.",
+      firstNameRequired: "Атыңызды енгізіңіз.",
+      lastNameRequired: "Тегіңізді енгізіңіз.",
       successTitle: "Email тексеріңіз",
       successText:
         "Аккаунт жасалды. Supabase email растауы қосулы болса, поштаңызды растаңыз.",
@@ -218,6 +243,8 @@ export default function RegisterPage() {
 
   const [language, setLanguage] = useState<AuthLanguage>("ru");
   const [theme, setTheme] = useState<AuthTheme>("dark");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -269,6 +296,20 @@ export default function RegisterPage() {
     setErrorMessage("");
     setSuccessMessage("");
 
+    const cleanedFirstName = firstName.trim();
+    const cleanedLastName = lastName.trim();
+    const displayName = `${cleanedFirstName} ${cleanedLastName}`.trim();
+
+    if (!cleanedFirstName) {
+      setErrorMessage(t.form.firstNameRequired);
+      return;
+    }
+
+    if (!cleanedLastName) {
+      setErrorMessage(t.form.lastNameRequired);
+      return;
+    }
+
     if (password !== confirmPassword) {
       setErrorMessage(t.form.passwordMismatch);
       return;
@@ -284,12 +325,20 @@ export default function RegisterPage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            first_name: cleanedFirstName,
+            last_name: cleanedLastName,
+            display_name: displayName,
+          },
+        },
       });
 
       if (error) {
         throw error;
       }
 
+      saveDisplayName(displayName);
       setSuccessMessage(t.form.successText);
 
       window.setTimeout(() => {
@@ -342,6 +391,34 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="grid gap-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2">
+              <span className={`text-sm font-bold ${titleClass}`}>
+                {t.form.firstName}
+              </span>
+              <input
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                placeholder={t.form.firstNamePlaceholder}
+                required
+                className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className={`text-sm font-bold ${titleClass}`}>
+                {t.form.lastName}
+              </span>
+              <input
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                placeholder={t.form.lastNamePlaceholder}
+                required
+                className={`h-12 rounded-2xl border px-4 text-sm outline-none transition focus:ring-4 ${inputClass}`}
+              />
+            </label>
+          </div>
+
           <label className="grid gap-2">
             <span className={`text-sm font-bold ${titleClass}`}>
               {t.form.email}
