@@ -89,6 +89,8 @@ During an autonomous work session, Codex should:
 - [x] Add dashboard API endpoints if frontend should stop reading dashboard tables directly from Supabase.
 - [x] Add subscription/payment backend design before real payment provider integration.
   - Provider choice is listed in `ACTIONS_REQUIRED.md`.
+- [x] Add Stripe checkout API.
+  - Webhook endpoint is implemented, but production verification needs `STRIPE_WEBHOOK_SECRET`.
 - [x] Add API error response documentation for frontend.
 - [x] Add deployment checklist for production backend and frontend integration.
 - [x] Update root README so it matches the current backend state.

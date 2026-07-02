@@ -15,6 +15,7 @@ It does not replace Supabase Auth or the Supabase database in Sprint 1. The fron
 - Exam Prep endpoints: `POST /api/v1/exam-preps`, `POST /api/v1/exam-preps/{id}/generate`
 - Diploma endpoints: `POST /api/v1/diplomas`, `POST /api/v1/diplomas/{id}/generate`
 - Dashboard endpoint: `GET /api/v1/dashboard`
+- Billing endpoint: `POST /api/v1/billing/checkout`
 - Interactive Swagger UI: `/docs`
 - CORS for the future Next.js frontend
 - Automated tests for health and AI route structure

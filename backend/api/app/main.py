@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import cors_origins
 from app.routers.ai import router as ai_router
 from app.routers.assignments import router as assignments_router
+from app.routers.billing import router as billing_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.diploma import router as diploma_router
 from app.routers.documents import router as documents_router
@@ -33,3 +34,4 @@ app.include_router(documents_router)
 app.include_router(exam_preps_router)
 app.include_router(diploma_router)
 app.include_router(dashboard_router)
+app.include_router(billing_router)

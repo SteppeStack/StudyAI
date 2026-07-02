@@ -111,6 +111,7 @@ Then smoke test these authenticated endpoints in Swagger:
 ```text
 GET /api/v1/dashboard
 POST /api/v1/ai/chat
+POST /api/v1/billing/checkout
 POST /api/v1/documents
 POST /api/v1/exam-preps
 POST /api/v1/diplomas
@@ -141,3 +142,4 @@ Expected:
 - authenticated endpoints return `401` without a token;
 - authenticated endpoints work with a valid Supabase access token;
 - AI endpoints include `model_used`, `fallback_used`, and usage fields.
+- billing checkout returns a Stripe `checkout_url` when Stripe env values are configured.

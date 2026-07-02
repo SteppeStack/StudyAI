@@ -186,6 +186,91 @@ class SupabaseGateway:
             },
         )
 
+    async def activate_subscription(
+        self,
+        user_id: str,
+        plan_id: str,
+        provider: str,
+        external_reference: str,
+    ) -> dict[str, Any]:
+        existing = await self._rest_get(
+            "subscriptions",
+            {
+                "provider": f"eq.{provider}",
+                "external_reference": f"eq.{external_reference}",
+                "select": "*",
+                "limit": "1",
+            },
+        )
+        if existing:
+            updated = await self._rest_patch(
+                "subscriptions",
+                {
+                    "id": f"eq.{existing[0]['id']}",
+                },
+                {
+                    "plan_id": plan_id,
+                    "status": "active",
+                    "canceled_at": None,
+                },
+            )
+            return updated[0]
+
+        await self._rest_patch(
+            "subscriptions",
+            {
+                "user_id": f"eq.{user_id}",
+                "status": "in.(active,trialing,past_due)",
+            },
+            {
+                "status": "canceled",
+                "canceled_at": datetime.now(UTC).isoformat(),
+            },
+        )
+        created = await self._rest_post(
+            "subscriptions",
+            {
+                "user_id": user_id,
+                "plan_id": plan_id,
+                "status": "active",
+                "provider": provider,
+                "external_reference": external_reference,
+            },
+        )
+        return created[0]
+
+    async def update_subscription_status(
+        self,
+        provider: str,
+        external_reference: str,
+        status: str,
+    ) -> None:
+        await self._rest_patch(
+            "subscriptions",
+            {
+                "provider": f"eq.{provider}",
+                "external_reference": f"eq.{external_reference}",
+            },
+            {"status": status},
+        )
+
+    async def mark_subscription_canceled(
+        self,
+        provider: str,
+        external_reference: str,
+    ) -> None:
+        await self._rest_patch(
+            "subscriptions",
+            {
+                "provider": f"eq.{provider}",
+                "external_reference": f"eq.{external_reference}",
+            },
+            {
+                "status": "canceled",
+                "canceled_at": datetime.now(UTC).isoformat(),
+            },
+        )
+
     async def get_usage_context(self, user_id: str) -> dict[str, Any]:
         subscription = await self._get_current_subscription(user_id)
         plan = await self._get_plan(subscription["plan_id"])
