@@ -39,6 +39,19 @@ During autonomous work, Codex should add items here instead of stopping immediat
   - Needed value/result: backend tests should start successfully.
   - Related task: Fix local Python environment and make backend tests runnable again.
 
+- [ ] 2026-07-02 - Add Stripe webhook secret after backend deploy
+  - Why: `POST /api/v1/billing/webhook` verifies Stripe signatures with `STRIPE_WEBHOOK_SECRET`.
+  - Where: Stripe Dashboard -> Developers -> Webhooks, then backend Vercel env.
+  - Steps:
+    1. Deploy backend and copy the public backend URL.
+    2. In Stripe Dashboard, create webhook endpoint: `https://YOUR_BACKEND_DOMAIN/api/v1/billing/webhook`.
+    3. Subscribe to `checkout.session.completed`, `customer.subscription.updated`, and `customer.subscription.deleted`.
+    4. Copy the webhook signing secret that starts with `whsec_`.
+    5. Add it to backend env as `STRIPE_WEBHOOK_SECRET`.
+    6. Redeploy backend.
+  - Needed value/result: Stripe webhooks can update Supabase subscriptions.
+  - Related task: Add Stripe checkout API.
+
 ## Completed Actions
 
 - [x] 2026-07-01 - Apply Documents API migration in Supabase

@@ -1,7 +1,10 @@
 import { supabase } from "@/lib/supabase";
 
 const apiBaseUrl =
-  process.env.NEXT_PUBLIC_STUDYAI_API_URL?.replace(/\/$/, "") ??
+  (
+    process.env.NEXT_PUBLIC_STUDYAI_API_URL ??
+    process.env.NEXT_PUBLIC_API_URL
+  )?.replace(/\/$/, "") ??
   "http://127.0.0.1:8000";
 
 type RequestOptions = Omit<RequestInit, "body" | "headers"> & {

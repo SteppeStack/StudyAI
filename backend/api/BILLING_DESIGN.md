@@ -1,6 +1,6 @@
-# StudyAI Billing Backend Design
+# StudyAI Billing API
 
-Payment integration is not implemented yet.
+Payment integration is implemented for Stripe Checkout and webhook handling.
 
 The selected provider is Stripe.
 
@@ -33,7 +33,7 @@ The provider flow should be:
 7. Backend updates `subscriptions`.
 8. Frontend refreshes dashboard/subscription state.
 
-## Future API
+## API
 
 ### Create Checkout Session
 
@@ -65,6 +65,20 @@ Response:
 }
 ```
 
+The backend maps:
+
+- `student_premium` -> `STRIPE_STUDENT_PREMIUM_PRICE_ID`
+- `teacher` -> `STRIPE_TEACHER_PRICE_ID`
+
+The checkout session includes metadata:
+
+```json
+{
+  "user_id": "SUPABASE_USER_ID",
+  "plan_id": "student_premium"
+}
+```
+
 ### Get Current Subscription
 
 The current implementation can use:
@@ -83,11 +97,24 @@ No user token. Must verify provider webhook signature.
 
 Webhook should handle:
 
-- subscription created
-- subscription renewed
 - subscription updated
 - subscription canceled
-- payment failed
+- checkout completed
+
+Currently handled Stripe event types:
+
+- `checkout.session.completed`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+
+After `checkout.session.completed`, backend:
+
+1. Cancels the old active/trialing/past_due subscription.
+2. Creates the new active subscription with the selected `plan_id`.
+3. Stores `provider=stripe`.
+4. Stores the Stripe subscription id in `external_reference`.
+
+Repeated checkout events are idempotent by `external_reference`.
 
 ## Required Environment Variables
 
@@ -236,8 +263,6 @@ When subscription is canceled:
 
 ## Not Implemented Yet
 
-- Real checkout session creation.
-- Provider webhook verification.
 - Customer portal.
 - Refunds.
 - Invoices.

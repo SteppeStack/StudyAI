@@ -1,4 +1,5 @@
 import base64
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -166,12 +167,33 @@ class GeminiProvider:
 
     def _fallback_error_detail(self, responses: list[dict[str, Any]]) -> str | dict[str, Any]:
         message = "Gemini API request failed"
-        if self.settings.app_env != "development":
-            return message
-
         return {
             "message": message,
-            "attempts": responses,
+            "attempts": [self._public_error_attempt(response) for response in responses],
+        }
+
+    @staticmethod
+    def _public_error_attempt(response: dict[str, Any]) -> dict[str, Any]:
+        provider_response = response.get("provider_response", "")
+        provider_error: dict[str, Any] = {}
+
+        try:
+            parsed_response = json.loads(provider_response)
+            error = parsed_response.get("error", {})
+            provider_error = {
+                "code": error.get("code"),
+                "status": error.get("status"),
+                "message": error.get("message"),
+            }
+        except ValueError:
+            provider_error = {"message": provider_response[:300]}
+
+        return {
+            "model": response.get("model"),
+            "status_code": response.get("status_code"),
+            "provider_error": {
+                key: value for key, value in provider_error.items() if value is not None
+            },
         }
 
     @staticmethod

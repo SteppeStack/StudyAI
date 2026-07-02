@@ -39,6 +39,13 @@ class Settings:
     max_analysis_file_size_bytes: int
     max_ai_input_chars: int
     ai_tutor_history_limit: int
+    payment_provider: str
+    payment_success_url: str
+    payment_cancel_url: str
+    stripe_secret_key: str
+    stripe_webhook_secret: str
+    stripe_student_premium_price_id: str
+    stripe_teacher_price_id: str
 
 
 @lru_cache
@@ -61,6 +68,13 @@ def get_settings() -> Settings:
         max_analysis_file_size_bytes=_int_env("MAX_ANALYSIS_FILE_SIZE_BYTES", 10485760),
         max_ai_input_chars=_int_env("MAX_AI_INPUT_CHARS", 30000),
         ai_tutor_history_limit=_int_env("AI_TUTOR_HISTORY_LIMIT", 8),
+        payment_provider=os.getenv("PAYMENT_PROVIDER", "stripe"),
+        payment_success_url=os.getenv("PAYMENT_SUCCESS_URL", ""),
+        payment_cancel_url=os.getenv("PAYMENT_CANCEL_URL", ""),
+        stripe_secret_key=os.getenv("STRIPE_SECRET_KEY", ""),
+        stripe_webhook_secret=os.getenv("STRIPE_WEBHOOK_SECRET", ""),
+        stripe_student_premium_price_id=os.getenv("STRIPE_STUDENT_PREMIUM_PRICE_ID", ""),
+        stripe_teacher_price_id=os.getenv("STRIPE_TEACHER_PRICE_ID", ""),
     )
 
 
