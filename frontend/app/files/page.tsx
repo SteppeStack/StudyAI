@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { getCurrentTheme } from "@/lib/theme";
 import {
   analyzeFile,
   createFileSignedUrl,
@@ -244,7 +245,6 @@ const languageStorageKeys = [
   "locale",
 ];
 
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 const localFilesStorageKey = "studyai-local-files";
 const allowedExtensions = [
   "pdf",
@@ -422,20 +422,6 @@ function getStoredLanguage(): Language {
   return "ru";
 }
 
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-
-  for (const key of themeStorageKeys) {
-    const value = window.localStorage.getItem(key);
-
-    if (value === "light" || value === "dark") {
-      return value;
-    }
-  }
-
-  return "dark";
-}
-
 function getStatusColor(status: FileStatus, isDark: boolean) {
   if (status === "ready") {
     return isDark
@@ -456,7 +442,7 @@ function getStatusColor(status: FileStatus, isDark: boolean) {
 
 function FilesContent() {
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [dataMode, setDataMode] = useState<"api" | "local" | "demo">("demo");
@@ -476,7 +462,7 @@ function FilesContent() {
 
   useEffect(() => {
     setLanguage(getStoredLanguage());
-    setTheme(getStoredTheme());
+    setTheme(getCurrentTheme());
 
     async function loadInitialFiles() {
       try {
@@ -520,7 +506,7 @@ function FilesContent() {
 
     function handleStorageChange() {
       setLanguage(getStoredLanguage());
-      setTheme(getStoredTheme());
+      setTheme(getCurrentTheme());
     }
 
     window.addEventListener("studyai:language-change", handleLanguageChange);

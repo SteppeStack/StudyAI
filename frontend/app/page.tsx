@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatUsdPriceWithPeriod } from "@/lib/pricing";
+import {
+  applyTheme,
+  getCurrentTheme,
+  saveTheme,
+  themeStorageKeys,
+} from "@/lib/theme";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -116,7 +122,6 @@ type LandingCopy = {
 };
 
 const languageKeys = ["studyai-language", "studyai_lang", "language", "locale"];
-const themeKeys = ["studyai-theme", "studyai_theme", "theme"];
 
 const languageLabels: Record<Language, string> = {
   en: "EN",
@@ -895,39 +900,6 @@ function saveLanguage(language: Language) {
   window.dispatchEvent(new CustomEvent("studyai:language-change", { detail: language }));
 }
 
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-
-  for (const key of themeKeys) {
-    const value = window.localStorage.getItem(key);
-
-    if (value === "light" || value === "dark") {
-      return value;
-    }
-  }
-
-  return "dark";
-}
-
-function saveTheme(theme: Theme) {
-  if (typeof window === "undefined") return;
-
-  for (const key of themeKeys) {
-    window.localStorage.setItem(key, theme);
-  }
-
-  applyTheme(theme);
-  window.dispatchEvent(new CustomEvent("studyai:theme-change", { detail: theme }));
-}
-
-function applyTheme(theme: Theme) {
-  if (typeof document === "undefined") return;
-
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.dataset.theme = theme;
-  document.body.style.backgroundColor = theme === "dark" ? "#020617" : "#f8fafc";
-}
-
 function SectionHeader({
   title,
   text,
@@ -1032,15 +1004,15 @@ function DashboardPreview({ t }: { t: LandingCopy }) {
 
 export default function Home() {
   const [language, setLanguage] = useState<Language>("en");
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
   const t = copy[language];
 
   useEffect(() => {
-    const storedTheme = getStoredTheme();
+    const storedTheme = getCurrentTheme();
 
     setLanguage(getStoredLanguage());
-    setTheme(storedTheme);
     applyTheme(storedTheme);
+    setTheme(storedTheme);
 
     function handleLanguageChange(event: Event) {
       const customEvent = event as CustomEvent<Language>;
@@ -1058,17 +1030,17 @@ export default function Home() {
       const customEvent = event as CustomEvent<Theme>;
 
       if (customEvent.detail === "light" || customEvent.detail === "dark") {
-        setTheme(customEvent.detail);
         applyTheme(customEvent.detail);
+        setTheme(customEvent.detail);
       }
     }
 
     function handleStorageChange(event: StorageEvent) {
-      if (event.key && themeKeys.includes(event.key)) {
-        const storedTheme = getStoredTheme();
+      if (event.key && themeStorageKeys.includes(event.key)) {
+        const storedTheme = getCurrentTheme();
 
-        setTheme(storedTheme);
         applyTheme(storedTheme);
+        setTheme(storedTheme);
       }
     }
 
@@ -1088,8 +1060,10 @@ export default function Home() {
   }
 
   function handleThemeSelect(nextTheme: Theme) {
+    applyTheme(nextTheme);
     setTheme(nextTheme);
     saveTheme(nextTheme);
+    window.dispatchEvent(new CustomEvent("studyai:theme-change", { detail: nextTheme }));
   }
 
   return (

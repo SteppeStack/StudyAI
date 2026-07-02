@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { getCurrentTheme } from "@/lib/theme";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -422,7 +423,6 @@ const languageStorageKeys = [
   "locale",
 ];
 
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 const documentsStorageKey = "studyai-local-documents";
 
 const emptyForm: DocumentForm = {
@@ -443,18 +443,6 @@ function getStoredLanguage(): Language {
   }
 
   return "ru";
-}
-
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-
-  for (const key of themeStorageKeys) {
-    const value = window.localStorage.getItem(key);
-
-    if (value === "light" || value === "dark") return value;
-  }
-
-  return "dark";
 }
 
 function countWords(value: string) {
@@ -619,7 +607,7 @@ function getStatusColor(status: DocumentStatus, isDark: boolean) {
 
 function DocumentsContent() {
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
   const [localDocuments, setLocalDocuments] = useState<StudyDocument[]>([]);
@@ -640,7 +628,7 @@ function DocumentsContent() {
     const storedLanguage = getStoredLanguage();
 
     setLanguage(storedLanguage);
-    setTheme(getStoredTheme());
+    setTheme(getCurrentTheme());
     setForm((current) => ({ ...current, language: storedLanguage }));
     setLocalDocuments(readLocalDocuments());
     setReady(true);
@@ -667,7 +655,7 @@ function DocumentsContent() {
 
     function handleStorageChange() {
       setLanguage(getStoredLanguage());
-      setTheme(getStoredTheme());
+      setTheme(getCurrentTheme());
       setLocalDocuments(readLocalDocuments());
     }
 

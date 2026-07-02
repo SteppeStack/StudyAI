@@ -7,6 +7,7 @@ import {
   saveLocalProfile,
 } from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
+import { applyTheme, getCurrentTheme, saveTheme } from "@/lib/theme";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -199,7 +200,6 @@ const languageStorageKeys = [
   "locale",
 ];
 
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 function getStoredValue<T extends string>(
   keys: string[],
   allowedValues: readonly T[],
@@ -224,14 +224,6 @@ function saveValueToStorage(keys: string[], value: string) {
   for (const key of keys) {
     window.localStorage.setItem(key, value);
   }
-}
-
-function applyTheme(theme: Theme) {
-  if (typeof document === "undefined") return;
-
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.dataset.theme = theme;
-  document.body.style.backgroundColor = theme === "dark" ? "#020617" : "#f8fafc";
 }
 
 function getInitials(name: string) {
@@ -259,7 +251,7 @@ export default function SettingsPage() {
   const router = useRouter();
 
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
   const [displayName, setDisplayName] = useState("");
   const [university, setUniversity] = useState("");
   const [program, setProgram] = useState("");
@@ -279,17 +271,13 @@ export default function SettingsPage() {
       "ru"
     );
 
-    const storedTheme = getStoredValue<Theme>(
-      themeStorageKeys,
-      ["light", "dark"],
-      "dark"
-    );
+    const storedTheme = getCurrentTheme();
 
     setLanguage(storedLanguage);
+    applyTheme(storedTheme);
     setTheme(storedTheme);
     saveValueToStorage(languageStorageKeys, storedLanguage);
-    saveValueToStorage(themeStorageKeys, storedTheme);
-    applyTheme(storedTheme);
+    saveTheme(storedTheme);
 
     const profile = readLocalProfile();
     setDisplayName(profile.displayName || "");
@@ -304,9 +292,9 @@ export default function SettingsPage() {
       const customEvent = event as CustomEvent<Theme>;
 
       if (customEvent.detail === "light" || customEvent.detail === "dark") {
-        setTheme(customEvent.detail);
-        saveValueToStorage(themeStorageKeys, customEvent.detail);
         applyTheme(customEvent.detail);
+        setTheme(customEvent.detail);
+        saveTheme(customEvent.detail);
       }
     }
 
@@ -353,9 +341,9 @@ export default function SettingsPage() {
   }
 
   function handleThemeChange(nextTheme: Theme) {
-    setTheme(nextTheme);
-    saveValueToStorage(themeStorageKeys, nextTheme);
     applyTheme(nextTheme);
+    setTheme(nextTheme);
+    saveTheme(nextTheme);
 
     window.dispatchEvent(
       new CustomEvent("studyai:theme-change", {
@@ -378,8 +366,8 @@ export default function SettingsPage() {
     });
 
     saveValueToStorage(languageStorageKeys, language);
-    saveValueToStorage(themeStorageKeys, theme);
     applyTheme(theme);
+    saveTheme(theme);
 
     window.setTimeout(() => {
       setLastUpdated(updatedAt);

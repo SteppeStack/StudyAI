@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { formatUsdPrice } from "@/lib/pricing";
+import { getCurrentTheme } from "@/lib/theme";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -337,7 +338,6 @@ const languageStorageKeys = [
   "locale",
 ];
 
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 const planPreviewStorageKey = "studyai-subscription-preview";
 
 const subscriptionExtraCopy = {
@@ -369,20 +369,6 @@ function getStoredLanguage(): Language {
   return "ru";
 }
 
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-
-  for (const key of themeStorageKeys) {
-    const value = window.localStorage.getItem(key);
-
-    if (value === "light" || value === "dark") {
-      return value;
-    }
-  }
-
-  return "dark";
-}
-
 function getComparisonLabel(key: string, t: Copy) {
   if (key === "credits") return t.credits;
   if (key === "aiTutor") return t.aiTutor;
@@ -402,7 +388,7 @@ function renderComparisonValue(value: boolean | string, t: Copy) {
 
 function SubscriptionContent() {
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
   const [selectedPreviewPlan, setSelectedPreviewPlan] = useState<PlanKey>("free");
   const [toast, setToast] = useState("");
@@ -413,7 +399,7 @@ function SubscriptionContent() {
 
   useEffect(() => {
     setLanguage(getStoredLanguage());
-    setTheme(getStoredTheme());
+    setTheme(getCurrentTheme());
     const savedPreview = window.localStorage.getItem(planPreviewStorageKey);
 
     if (
@@ -446,7 +432,7 @@ function SubscriptionContent() {
 
     function handleStorageChange() {
       setLanguage(getStoredLanguage());
-      setTheme(getStoredTheme());
+      setTheme(getCurrentTheme());
     }
 
     window.addEventListener("studyai:language-change", handleLanguageChange);

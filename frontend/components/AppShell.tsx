@@ -4,6 +4,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { readLocalProfile, type LocalProfile } from "@/lib/profile";
 import {
+  applyTheme,
+  getCurrentTheme,
+  saveTheme,
+  type Theme,
+} from "@/lib/theme";
+import {
   ReactNode,
   useEffect,
   useMemo,
@@ -12,7 +18,6 @@ import {
 } from "react";
 
 type Language = "en" | "ru" | "kz";
-type Theme = "light" | "dark";
 
 type Copy = {
   search: string;
@@ -141,7 +146,6 @@ const languageStorageKeys = [
   "locale",
 ];
 
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 const navItems = [
   { key: "dashboard", href: "/dashboard", icon: "▣" },
   { key: "aiTutor", href: "/ai-tutor", icon: "🤖" },
@@ -188,19 +192,6 @@ function saveValueToStorage(keys: string[], value: string) {
   }
 }
 
-function applyTheme(theme: Theme) {
-  if (typeof document === "undefined") return;
-
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.dataset.theme = theme;
-
-  if (theme === "light") {
-    document.body.style.backgroundColor = "#f8fafc";
-  } else {
-    document.body.style.backgroundColor = "#020617";
-  }
-}
-
 function getInitials(name: string) {
   const cleaned = name.trim();
 
@@ -229,7 +220,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const commandMenuRef = useRef<HTMLDivElement | null>(null);
 
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
   const [profile, setProfile] = useState<LocalProfile>({});
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [commandMenuOpen, setCommandMenuOpen] = useState(false);
@@ -295,17 +286,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
       "ru"
     );
 
-    const storedTheme = getStoredValue<Theme>(
-      themeStorageKeys,
-      ["light", "dark"],
-      "dark"
-    );
+    const storedTheme = getCurrentTheme();
 
     setLanguage(storedLanguage);
+    applyTheme(storedTheme);
     setTheme(storedTheme);
     saveValueToStorage(languageStorageKeys, storedLanguage);
-    saveValueToStorage(themeStorageKeys, storedTheme);
-    applyTheme(storedTheme);
+    saveTheme(storedTheme);
     setProfile(readLocalProfile());
   }, []);
 
@@ -345,18 +332,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
         language
       );
 
-      const storedTheme = getStoredValue<Theme>(
-        themeStorageKeys,
-        ["light", "dark"],
-        theme
-      );
+      const storedTheme = getCurrentTheme();
 
       setProfile(readLocalProfile());
       setLanguage(storedLanguage);
+      applyTheme(storedTheme);
       setTheme(storedTheme);
       saveValueToStorage(languageStorageKeys, storedLanguage);
-      saveValueToStorage(themeStorageKeys, storedTheme);
-      applyTheme(storedTheme);
+      saveTheme(storedTheme);
     }
 
     function handleLanguageChange(event: Event) {
@@ -376,9 +359,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
       const customEvent = event as CustomEvent<Theme>;
 
       if (customEvent.detail === "light" || customEvent.detail === "dark") {
-        setTheme(customEvent.detail);
-        saveValueToStorage(themeStorageKeys, customEvent.detail);
         applyTheme(customEvent.detail);
+        setTheme(customEvent.detail);
+        saveTheme(customEvent.detail);
       }
     }
 
@@ -417,9 +400,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
   function handleThemeToggle() {
     const nextTheme: Theme = theme === "dark" ? "light" : "dark";
 
-    setTheme(nextTheme);
-    saveValueToStorage(themeStorageKeys, nextTheme);
     applyTheme(nextTheme);
+    setTheme(nextTheme);
+    saveTheme(nextTheme);
 
     window.dispatchEvent(
       new CustomEvent("studyai:theme-change", {

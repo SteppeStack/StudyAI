@@ -9,6 +9,8 @@
 
 html {
   scroll-behavior: smooth;
+  background: var(--background);
+  color-scheme: light;
 }
 
 * {

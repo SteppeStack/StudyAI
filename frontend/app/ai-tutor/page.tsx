@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AppShell from "@/components/AppShell";
 import { sendAiTutorMessage } from "@/lib/studyApi";
+import { getCurrentTheme } from "@/lib/theme";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -289,8 +290,6 @@ const languageStorageKeys = [
   "locale",
 ];
 
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
-
 const localeMap: Record<Language, string> = {
   en: "en-US",
   ru: "ru-RU",
@@ -472,20 +471,6 @@ function getStoredLanguage(): Language {
   return "ru";
 }
 
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-
-  for (const key of themeStorageKeys) {
-    const value = window.localStorage.getItem(key);
-
-    if (value === "light" || value === "dark") {
-      return value;
-    }
-  }
-
-  return "dark";
-}
-
 function formatDate(date: Date | "today", language: Language, todayLabel: string) {
   if (date === "today") return todayLabel;
 
@@ -498,7 +483,7 @@ function formatDate(date: Date | "today", language: Language, todayLabel: string
 
 function TutorContent() {
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
   const [conversationId, setConversationId] = useState<string>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -513,7 +498,7 @@ function TutorContent() {
 
   useEffect(() => {
     setLanguage(getStoredLanguage());
-    setTheme(getStoredTheme());
+    setTheme(getCurrentTheme());
 
     function handleLanguageChange(event: Event) {
       const customEvent = event as CustomEvent<Language>;
@@ -537,7 +522,7 @@ function TutorContent() {
 
     function handleStorageChange() {
       setLanguage(getStoredLanguage());
-      setTheme(getStoredTheme());
+      setTheme(getCurrentTheme());
     }
 
     window.addEventListener("studyai:language-change", handleLanguageChange);

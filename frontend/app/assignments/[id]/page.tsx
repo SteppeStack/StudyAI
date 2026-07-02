@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import AppShell from "@/components/AppShell";
+import { getCurrentTheme } from "@/lib/theme";
 import {
   deleteAssignment,
   generateAssignmentHelp,
@@ -303,7 +304,6 @@ const languageStorageKeys = [
   "language",
   "locale",
 ];
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 const assignmentsStorageKey = "studyai-local-assignments";
 const workspaceStoragePrefix = "studyai-assignment-workspace";
 const checklistIds: ChecklistId[] = [
@@ -322,15 +322,6 @@ function getStoredLanguage(): Language {
     if (value === "en" || value === "ru" || value === "kz") return value;
   }
   return "ru";
-}
-
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-  for (const key of themeStorageKeys) {
-    const value = window.localStorage.getItem(key);
-    if (value === "light" || value === "dark") return value;
-  }
-  return "dark";
 }
 
 function getFutureDate(days: number) {
@@ -501,7 +492,7 @@ function AssignmentDetailContent() {
   const assignmentId = decodeURIComponent(params.id);
 
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
   const [assignment, setAssignment] = useState<LiveAssignment | null>(null);
   const [draft, setDraft] = useState<LiveAssignment | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceState>({
@@ -554,7 +545,7 @@ function AssignmentDetailContent() {
 
   useEffect(() => {
     setLanguage(getStoredLanguage());
-    setTheme(getStoredTheme());
+    setTheme(getCurrentTheme());
     loadAssignment();
 
     function handleLanguageChange(event: Event) {

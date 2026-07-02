@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import AppShell from "@/components/AppShell";
+import { getCurrentTheme } from "@/lib/theme";
 import {
   createAssignment,
   deleteAssignment,
@@ -391,7 +392,6 @@ const languageStorageKeys = [
   "language",
   "locale",
 ];
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 const localStorageKey = "studyai-local-assignments";
 
 const emptyForm: AssignmentForm = {
@@ -415,18 +415,6 @@ function getStoredLanguage(): Language {
   }
 
   return "ru";
-}
-
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-
-  for (const key of themeStorageKeys) {
-    const value = window.localStorage.getItem(key);
-
-    if (value === "light" || value === "dark") return value;
-  }
-
-  return "dark";
 }
 
 function getFutureDate(days: number) {
@@ -634,7 +622,7 @@ function getStatusColor(status: DisplayStatus, isDark: boolean) {
 
 function AssignmentsContent() {
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
   const [assignments, setAssignments] = useState<LiveAssignment[]>([]);
   const [dataMode, setDataMode] = useState<DataMode>("demo");
   const [loading, setLoading] = useState(true);
@@ -697,7 +685,7 @@ function AssignmentsContent() {
 
   useEffect(() => {
     setLanguage(getStoredLanguage());
-    setTheme(getStoredTheme());
+    setTheme(getCurrentTheme());
     loadAssignments();
 
     function handleLanguageChange(event: Event) {
@@ -716,7 +704,7 @@ function AssignmentsContent() {
 
     function handleStorageChange() {
       setLanguage(getStoredLanguage());
-      setTheme(getStoredTheme());
+      setTheme(getCurrentTheme());
     }
 
     window.addEventListener("studyai:language-change", handleLanguageChange);

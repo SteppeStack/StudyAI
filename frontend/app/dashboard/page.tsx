@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { readLocalProfile, saveLocalProfile } from "@/lib/profile";
+import { getCurrentTheme } from "@/lib/theme";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -433,7 +434,6 @@ const languageStorageKeys = [
   "locale",
 ];
 
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 const assignmentsStorageKey = "studyai-local-assignments";
 const filesStorageKey = "studyai-local-files";
 const documentsStorageKey = "studyai-local-documents";
@@ -950,23 +950,9 @@ function getStoredLanguage(): Language {
   return "ru";
 }
 
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-
-  for (const key of themeStorageKeys) {
-    const value = window.localStorage.getItem(key);
-
-    if (value === "light" || value === "dark") {
-      return value;
-    }
-  }
-
-  return "dark";
-}
-
 function DashboardContent() {
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
   const [snapshot, setSnapshot] = useState<DashboardSnapshot>(emptySnapshot);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingForm, setOnboardingForm] = useState({
@@ -987,7 +973,7 @@ function DashboardContent() {
     const onboardingState = readRecord(onboardingStorageKey);
 
     setLanguage(storedLanguage);
-    setTheme(getStoredTheme());
+    setTheme(getCurrentTheme());
     touchStudyProgress();
     setSnapshot(readDashboardSnapshot(storedLanguage));
     setOnboardingForm({
@@ -1025,7 +1011,7 @@ function DashboardContent() {
       const nextLanguage = getStoredLanguage();
 
       setLanguage(nextLanguage);
-      setTheme(getStoredTheme());
+      setTheme(getCurrentTheme());
       setSnapshot(readDashboardSnapshot(nextLanguage));
     }
 

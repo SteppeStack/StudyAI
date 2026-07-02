@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { getCurrentTheme } from "@/lib/theme";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -52,8 +53,6 @@ const languageStorageKeys = [
   "language",
   "locale",
 ];
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
-
 function getStoredLanguage(): Language {
   if (typeof window === "undefined") return "ru";
 
@@ -65,24 +64,13 @@ function getStoredLanguage(): Language {
   return "ru";
 }
 
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-
-  for (const key of themeStorageKeys) {
-    const value = window.localStorage.getItem(key);
-    if (value === "light" || value === "dark") return value;
-  }
-
-  return "dark";
-}
-
 export default function NotFound() {
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
 
   useEffect(() => {
     setLanguage(getStoredLanguage());
-    setTheme(getStoredTheme());
+    setTheme(getCurrentTheme());
   }, []);
 
   const t = copy[language];

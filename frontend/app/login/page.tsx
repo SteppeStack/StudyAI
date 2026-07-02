@@ -9,6 +9,7 @@ import AuthShell, {
 } from "@/components/AuthShell";
 import { getDisplayNameFromMetadata, saveDisplayName } from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
+import { applyTheme, getCurrentTheme, saveTheme } from "@/lib/theme";
 
 type LoginCopy = {
   shell: {
@@ -148,8 +149,6 @@ const languageStorageKeys = [
   "locale",
 ];
 
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
-
 function getStoredLanguage(): AuthLanguage {
   if (typeof window === "undefined") return "ru";
 
@@ -164,20 +163,6 @@ function getStoredLanguage(): AuthLanguage {
   return "ru";
 }
 
-function getStoredTheme(): AuthTheme {
-  if (typeof window === "undefined") return "dark";
-
-  for (const key of themeStorageKeys) {
-    const value = window.localStorage.getItem(key);
-
-    if (value === "light" || value === "dark") {
-      return value;
-    }
-  }
-
-  return "dark";
-}
-
 function saveValueToStorage(keys: string[], value: string) {
   if (typeof window === "undefined") return;
 
@@ -186,19 +171,11 @@ function saveValueToStorage(keys: string[], value: string) {
   }
 }
 
-function applyTheme(theme: AuthTheme) {
-  if (typeof document === "undefined") return;
-
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.dataset.theme = theme;
-  document.body.style.backgroundColor = theme === "dark" ? "#020617" : "#f8fafc";
-}
-
 export default function LoginPage() {
   const router = useRouter();
 
   const [language, setLanguage] = useState<AuthLanguage>("ru");
-  const [theme, setTheme] = useState<AuthTheme>("dark");
+  const [theme, setTheme] = useState<AuthTheme>(() => getCurrentTheme());
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -209,13 +186,13 @@ export default function LoginPage() {
 
   useEffect(() => {
     const storedLanguage = getStoredLanguage();
-    const storedTheme = getStoredTheme();
+    const storedTheme = getCurrentTheme();
 
     setLanguage(storedLanguage);
+    applyTheme(storedTheme);
     setTheme(storedTheme);
     saveValueToStorage(languageStorageKeys, storedLanguage);
-    saveValueToStorage(themeStorageKeys, storedTheme);
-    applyTheme(storedTheme);
+    saveTheme(storedTheme);
   }, []);
 
   function handleLanguageChange(nextLanguage: AuthLanguage) {
@@ -232,9 +209,9 @@ export default function LoginPage() {
   function handleThemeToggle() {
     const nextTheme: AuthTheme = theme === "dark" ? "light" : "dark";
 
-    setTheme(nextTheme);
-    saveValueToStorage(themeStorageKeys, nextTheme);
     applyTheme(nextTheme);
+    setTheme(nextTheme);
+    saveTheme(nextTheme);
 
     window.dispatchEvent(
       new CustomEvent("studyai:theme-change", {

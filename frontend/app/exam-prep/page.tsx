@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { getCurrentTheme } from "@/lib/theme";
 
 type Language = "en" | "ru" | "kz";
 type Theme = "light" | "dark";
@@ -435,7 +436,6 @@ const languageStorageKeys = [
   "locale",
 ];
 
-const themeStorageKeys = ["studyai-theme", "studyai_theme", "theme"];
 const examFormStorageKey = "studyai-exam-prep-form";
 const savedExamStorageKey = "studyai-exam-prep-saved";
 
@@ -509,23 +509,9 @@ function getStoredLanguage(): Language {
   return "ru";
 }
 
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-
-  for (const key of themeStorageKeys) {
-    const value = window.localStorage.getItem(key);
-
-    if (value === "light" || value === "dark") {
-      return value;
-    }
-  }
-
-  return "dark";
-}
-
 function ExamPrepContent() {
   const [language, setLanguage] = useState<Language>("ru");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => getCurrentTheme());
 
   const [form, setForm] = useState<ExamForm>(emptyExamForm);
 
@@ -540,7 +526,7 @@ function ExamPrepContent() {
 
   useEffect(() => {
     setLanguage(getStoredLanguage());
-    setTheme(getStoredTheme());
+    setTheme(getCurrentTheme());
 
     const savedForm = window.localStorage.getItem(examFormStorageKey);
     const savedPlans = window.localStorage.getItem(savedExamStorageKey);
@@ -585,7 +571,7 @@ function ExamPrepContent() {
 
     function handleStorageChange() {
       setLanguage(getStoredLanguage());
-      setTheme(getStoredTheme());
+      setTheme(getCurrentTheme());
     }
 
     window.addEventListener("studyai:language-change", handleLanguageChange);
