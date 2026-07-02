@@ -411,51 +411,30 @@ const recentPromptText: Record<
 const tutorExtraCopy = {
   en: {
     thinking: "Thinking...",
-    backendUnavailable:
-      "Backend is unavailable. Showing local preview response.",
     retry: "Retry",
     attachHint: "Use the Files page to upload and analyze study materials.",
-    fallbackPrefix: "Local preview",
-    fallbackBody:
-      "Break the question into definitions, key steps, one example, and a short practice check. When the backend is available, AI Tutor will provide a full generated answer.",
   },
   ru: {
     thinking: "Думаю...",
-    backendUnavailable:
-      "Backend недоступен. Показан локальный предварительный ответ.",
     retry: "Повторить",
     attachHint: "Используй страницу Files, чтобы загрузить и проанализировать материалы.",
-    fallbackPrefix: "Локальный preview",
-    fallbackBody:
-      "Разбей вопрос на определения, ключевые шаги, один пример и короткую проверку. Когда backend будет доступен, AI Tutor даст полноценный сгенерированный ответ.",
   },
   kz: {
     thinking: "Ойлануда...",
-    backendUnavailable:
-      "Backend қолжетімсіз. Жергілікті алдын ала жауап көрсетілді.",
     retry: "Қайталау",
     attachHint: "Оқу материалдарын жүктеу және талдау үшін Files бетін қолданыңыз.",
-    fallbackPrefix: "Жергілікті preview",
-    fallbackBody:
-      "Сұрақты анықтамаларға, негізгі қадамдарға, бір мысалға және қысқа тексеруге бөліңіз. Backend қолжетімді болғанда AI Tutor толық жауап береді.",
   },
 } satisfies Record<
   Language,
   {
     thinking: string;
-    backendUnavailable: string;
     retry: string;
     attachHint: string;
-    fallbackPrefix: string;
-    fallbackBody: string;
   }
 >;
 
-function buildLocalTutorFallback(prompt: string, language: Language) {
-  const extra = tutorExtraCopy[language];
-
-  return `${extra.fallbackPrefix}: ${prompt}\n\n${extra.fallbackBody}`;
-}
+const backendUnavailableMessage =
+  "Backend is unavailable. Please start the API server.";
 
 function getStoredLanguage(): Language {
   if (typeof window === "undefined") return "ru";
@@ -613,16 +592,7 @@ function TutorContent() {
       setLastFailedPrompt("");
     } catch {
       setLastFailedPrompt(trimmed);
-      setMessages((current) => [
-        ...current,
-        {
-          id: `local-assistant-${Date.now()}`,
-          role: "assistant",
-          content: buildLocalTutorFallback(trimmed, language),
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-      setError(extra.backendUnavailable);
+      setError(backendUnavailableMessage);
     } finally {
       setSending(false);
     }
